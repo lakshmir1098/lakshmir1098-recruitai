@@ -23,7 +23,7 @@ import {
   FileText,
   X
 } from "lucide-react";
-import { sendInterviewInvite, sendRejectionEmail, addCandidate, getCandidates, updateCandidateStatus, type ScreeningResult } from "@/lib/mock-api";
+import { sendInterviewInvite, type ScreeningResult } from "@/lib/mock-api";
 import { cn } from "@/lib/utils";
 import mammoth from "mammoth";
 import * as pdfjsLib from "pdfjs-dist";
@@ -37,8 +37,6 @@ export default function Screen() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<ScreeningResult | null>(null);
   const [inviteSent, setInviteSent] = useState(false);
-  const [rejected, setRejected] = useState(false);
-  const [candidateInfo, setCandidateInfo] = useState<{ name: string; email: string; role: string } | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isParsingFile, setIsParsingFile] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -162,8 +160,6 @@ export default function Screen() {
     setIsAnalyzing(true);
     setResult(null);
     setInviteSent(false);
-    setRejected(false);
-    setCandidateInfo(null);
   
     try {
       const response = await fetch(
@@ -197,38 +193,11 @@ export default function Screen() {
         recommendedAction: raw.recommendedAction,
       };
       
-      // Extract candidate info from resume (basic extraction)
-      const emailMatch = resumeText.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/);
-      const nameMatch = resumeText.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/m);
-      const roleMatch = jobDescription.match(/(?:position|role|job|opening)[:\s]+([A-Z][^.!?]+)/i);
-      
-      const candidateName = nameMatch ? nameMatch[1] : `Candidate ${Date.now().toString().slice(-4)}`;
-      const candidateEmail = emailMatch ? emailMatch[0] : `candidate${Date.now().toString().slice(-4)}@email.com`;
-      const candidateRole = roleMatch ? roleMatch[1].trim() : "Applied Role";
-      
-      setCandidateInfo({ name: candidateName, email: candidateEmail, role: candidateRole });
       setResult(screeningResult);
-      
-      // Add candidate to list and Action Items based on recommendedAction
-      // Actions will be taken either here (if user clicks) or in Action Items screen
-      const newCandidate = addCandidate({
-        name: candidateName,
-        email: candidateEmail,
-        role: candidateRole,
-        fitScore: screeningResult.fitScore,
-        fitCategory: screeningResult.fitCategory,
-        status: screeningResult.recommendedAction === "Interview" ? "Pending" : 
-                screeningResult.recommendedAction === "Reject" ? "Pending" : 
-                "Review",
-        screenedAt: new Date(),
-        lastRole: "Unknown",
-        resumeText: resumeText,
-        jobDescription: jobDescription,
-      }, screeningResult.recommendedAction);
-      
+        
       toast({
         title: "Analysis Complete",
-        description: `Fit score: ${screeningResult.fitScore}% - ${screeningResult.recommendedAction} recommended`,
+        description: `Fit score: ${screeningResult.fitScore}%`,
       });
   
     } catch (err) {
@@ -256,74 +225,12 @@ export default function Screen() {
   
 
   const handleSendInvite = async () => {
-    if (!candidateInfo || !result) return;
-    
-    try {
-      const candidates = getCandidates();
-      const existingCandidate = candidates.find(c => c.email === candidateInfo.email && c.role === candidateInfo.role);
-      const candidateId = existingCandidate?.id || Date.now().toString();
-      
-      await sendInterviewInvite(
-        candidateId,
-        candidateInfo.email,
-        candidateInfo.name,
-        candidateInfo.role
-      );
-      setInviteSent(true);
-      
-      // Update candidate status if exists
-      if (existingCandidate) {
-        updateCandidateStatus(existingCandidate.id, "Invited");
-      }
-      
-      toast({
-        title: "Interview Invite Sent",
-        description: `${candidateInfo.name} has been notified via email.`,
-      });
-    } catch (error) {
-      console.error("Invite error:", error);
-      toast({
-        title: "Error",
-        description: "Failed to send invite. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleReject = async () => {
-    if (!candidateInfo || !result) return;
-    
-    try {
-      const candidates = getCandidates();
-      const existingCandidate = candidates.find(c => c.email === candidateInfo.email && c.role === candidateInfo.role);
-      const candidateId = existingCandidate?.id || Date.now().toString();
-      
-      await sendRejectionEmail(
-        candidateId,
-        candidateInfo.email,
-        candidateInfo.name,
-        candidateInfo.role
-      );
-      setRejected(true);
-      
-      // Update candidate status if exists
-      if (existingCandidate) {
-        updateCandidateStatus(existingCandidate.id, "Rejected");
-      }
-      
-      toast({
-        title: "Rejection Email Sent",
-        description: `${candidateInfo.name} has been notified.`,
-        variant: "destructive",
-      });
-    } catch (error) {
-      console.error("Reject error:", error);
-      toast({
-        title: "Error",
-        description: "Failed to send rejection email. Please try again.",
-        variant: "destructive",
-      });
-    }
+    await sendInterviewInvite("new-candidate");
+    setInviteSent(true);
+    toast({
+      title: "Interview Invite Sent",
+      description: "The candidate has been notified.",
+    });
   };
 
   const getActionColor = (action: string) => {
@@ -615,66 +522,22 @@ export default function Screen() {
 
           
 
-          {/* Action Buttons - Based on AI Recommended Action */}
+          {/* Action Buttons */}
           <Card className="shadow-sm">
             <CardContent className="pt-6">
               <div className="flex flex-wrap gap-4 justify-center">
-                {/* Show Invite button when AI recommends Interview */}
                 {result.recommendedAction === "Interview" && !inviteSent && (
                   <Button onClick={handleSendInvite} size="lg" className="bg-accent hover:bg-accent/90">
                     <Mail className="h-5 w-5 mr-2" />
                     Send Interview Invite
                   </Button>
                 )}
-                
-                {/* Show Reject button when AI recommends Reject */}
-                {result.recommendedAction === "Reject" && !rejected && (
-                  <Button onClick={handleReject} size="lg" variant="destructive">
-                    <XCircle className="h-5 w-5 mr-2" />
-                    Reject Candidate
-                  </Button>
-                )}
-                
-                {/* Show both buttons when AI recommends Review */}
-                {result.recommendedAction === "Review" && (
-                  <>
-                    {!inviteSent && !rejected && (
-                      <>
-                        <Button onClick={handleSendInvite} size="lg" className="bg-accent hover:bg-accent/90">
-                          <Mail className="h-5 w-5 mr-2" />
-                          Send Interview Invite
-                        </Button>
-                        <Button onClick={handleReject} size="lg" variant="destructive">
-                          <XCircle className="h-5 w-5 mr-2" />
-                          Reject Candidate
-                        </Button>
-                      </>
-                    )}
-                  </>
-                )}
-                
-                {/* Success messages for actions taken */}
                 {inviteSent && (
                   <div className="flex items-center gap-2 text-accent font-medium">
                     <CheckCircle className="h-5 w-5" />
                     Interview invite sent successfully
                   </div>
                 )}
-                
-                {rejected && (
-                  <div className="flex items-center gap-2 text-destructive font-medium">
-                    <XCircle className="h-5 w-5" />
-                    Rejection email sent
-                  </div>
-                )}
-                
-                {/* Note: If action not taken, candidate will appear in Action Items */}
-                {!inviteSent && !rejected && (
-                  <p className="text-sm text-muted-foreground w-full text-center mt-2">
-                    Note: If you don't take action here, this candidate will appear in Action Items for review.
-                  </p>
-                )}
-                
                 <Button
                   variant="outline"
                   size="lg"
@@ -683,8 +546,6 @@ export default function Screen() {
                     setJobDescription("");
                     setResumeText("");
                     setInviteSent(false);
-                    setRejected(false);
-                    setCandidateInfo(null);
                     setUploadedFile(null);
                     if (fileInputRef.current) {
                       fileInputRef.current.value = "";
