@@ -5,11 +5,7 @@ export interface ScreeningResult {
   recommendedAction: "Interview" | "Review" | "Reject";
   strengths: string[];
   gaps: string[];
-  candidateSnapshot: {
-    estimatedSeniority: string;
-    yearsOfExperience: number;
-    lastRole: string;
-  };
+  
 }
 
 export interface Candidate {

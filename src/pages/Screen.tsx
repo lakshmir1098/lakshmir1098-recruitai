@@ -162,7 +162,7 @@ export default function Screen() {
   
     try {
       const response = await fetch(
-        "https://mancyram.app.n8n.cloud/webhook-test/b41ad258-86d3-42e3-9319-88271b95e5ab",
+        "https://mancyram.app.n8n.cloud/webhook/b41ad258-86d3-42e3-9319-88271b95e5ab",
         {
           method: "POST",
           headers: {
