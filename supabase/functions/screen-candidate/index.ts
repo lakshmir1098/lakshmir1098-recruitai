@@ -19,8 +19,8 @@ serve(async (req) => {
       resumeTextLength: resumeText?.length 
     });
 
-    // Forward request to n8n webhook
-    const response = await fetch("https://mancyram.app.n8n.cloud/webhook/recruitai/screen", {
+    // Forward request to n8n webhook (test mode)
+    const response = await fetch("https://mancyram.app.n8n.cloud/webhook-test/recruitai/screen", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
