@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -162,23 +163,14 @@ export default function Screen() {
     setInviteSent(false);
 
     try {
-      // Call n8n webhook for AI screening
-      const response = await fetch("https://mancyram.app.n8n.cloud/webhook/recruitai/screen", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          jobDescription,
-          resumeText,
-        }),
+      // Call Supabase Edge Function proxy for AI screening
+      const { data: screeningResult, error } = await supabase.functions.invoke('screen-candidate', {
+        body: { jobDescription, resumeText },
       });
 
-      if (!response.ok) {
-        throw new Error(`Webhook error: ${response.status}`);
+      if (error) {
+        throw new Error(error.message);
       }
-
-      const screeningResult = await response.json();
       setResult(screeningResult);
 
       // Add to candidates list
