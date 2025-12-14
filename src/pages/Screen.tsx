@@ -162,7 +162,23 @@ export default function Screen() {
     setInviteSent(false);
 
     try {
-      const screeningResult = await screenCandidate(jobDescription, resumeText);
+      // Call n8n webhook for AI screening
+      const response = await fetch("https://mancyram.app.n8n.cloud/webhook/api/recruitai/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          jobDescription,
+          resumeText,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Webhook error: ${response.status}`);
+      }
+
+      const screeningResult = await response.json();
       setResult(screeningResult);
 
       // Add to candidates list
@@ -175,7 +191,7 @@ export default function Screen() {
         status: screeningResult.recommendedAction === "Interview" ? "Pending" : 
                 screeningResult.recommendedAction === "Review" ? "Review" : "Rejected",
         screenedAt: new Date(),
-        lastRole: screeningResult.candidateSnapshot.lastRole,
+        lastRole: screeningResult.candidateSnapshot?.lastRole || "Unknown",
       });
 
       toast({
@@ -183,9 +199,10 @@ export default function Screen() {
         description: `Fit score: ${screeningResult.fitScore}% - ${screeningResult.fitCategory} match`,
       });
     } catch (error) {
+      console.error("Screening error:", error);
       toast({
         title: "Analysis Failed",
-        description: "An error occurred during screening.",
+        description: "An error occurred during screening. Please try again.",
         variant: "destructive",
       });
     } finally {
