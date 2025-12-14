@@ -239,9 +239,19 @@ export function addCandidate(candidate: Omit<Candidate, "id">, recommendedAction
     ];
   }
   
+  // Ensure all required fields are present
   const newCandidate: Candidate = {
-    ...candidate,
     id: Date.now().toString(),
+    name: candidate.name || "Unknown",
+    email: candidate.email || "unknown@email.com",
+    role: candidate.role || "Unknown Role",
+    fitScore: candidate.fitScore || 0,
+    fitCategory: candidate.fitCategory || "Medium",
+    status: candidate.status || "Review",
+    screenedAt: candidate.screenedAt || new Date(),
+    lastRole: candidate.lastRole || "Unknown",
+    resumeText: candidate.resumeText,
+    jobDescription: candidate.jobDescription,
   };
   candidates = [newCandidate, ...candidates];
   

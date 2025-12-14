@@ -188,12 +188,53 @@ export default function Screen() {
   
       const raw = await response.json();
       
+      // Validate response structure - backend should return ONLY these fields
+      if (!raw || typeof raw !== 'object') {
+        throw new Error("Invalid response format from backend");
+      }
+      
+      // Validate and parse fitScore (0-100)
+      const fitScore = raw.fitScore !== undefined && raw.fitScore !== null 
+        ? Number(raw.fitScore) 
+        : null;
+      if (fitScore === null || isNaN(fitScore) || fitScore < 0 || fitScore > 100) {
+        throw new Error(`Invalid fitScore: ${raw.fitScore}. Must be a number between 0-100`);
+      }
+      
+      // Validate fitCategory (Strong | Medium | Low)
+      const validFitCategories = ["Strong", "Medium", "Low"];
+      if (!raw.fitCategory || !validFitCategories.includes(raw.fitCategory)) {
+        throw new Error(`Invalid fitCategory: ${raw.fitCategory}. Must be one of: ${validFitCategories.join(", ")}`);
+      }
+      
+      // Validate screeningSummary (should be a string, 3 sentences)
+      if (!raw.screeningSummary || typeof raw.screeningSummary !== 'string') {
+        throw new Error("Invalid screeningSummary: Must be a string");
+      }
+      
+      // Validate strengths (array)
+      if (!Array.isArray(raw.strengths)) {
+        throw new Error("Invalid strengths: Must be an array");
+      }
+      
+      // Validate gaps (array)
+      if (!Array.isArray(raw.gaps)) {
+        throw new Error("Invalid gaps: Must be an array");
+      }
+      
+      // Validate recommendedAction (Interview | Review | Reject)
+      const validActions = ["Interview", "Review", "Reject"];
+      if (!raw.recommendedAction || !validActions.includes(raw.recommendedAction)) {
+        throw new Error(`Invalid recommendedAction: ${raw.recommendedAction}. Must be one of: ${validActions.join(", ")}`);
+      }
+      
+      // Create screening result with validated data
       const screeningResult: ScreeningResult = {
-        fitScore: Number(raw.fitScore),
+        fitScore: fitScore,
         fitCategory: raw.fitCategory,
         screeningSummary: raw.screeningSummary,
-        strengths: Array.isArray(raw.strengths) ? raw.strengths : [],
-        gaps: Array.isArray(raw.gaps) ? raw.gaps : [],
+        strengths: raw.strengths,
+        gaps: raw.gaps,
         recommendedAction: raw.recommendedAction,
       };
       
@@ -211,20 +252,25 @@ export default function Screen() {
       
       // Add candidate to list and Action Items based on recommendedAction
       // Actions will be taken either here (if user clicks) or in Action Items screen
-      const newCandidate = addCandidate({
-        name: candidateName,
-        email: candidateEmail,
-        role: candidateRole,
-        fitScore: screeningResult.fitScore,
-        fitCategory: screeningResult.fitCategory,
-        status: screeningResult.recommendedAction === "Interview" ? "Pending" : 
-                screeningResult.recommendedAction === "Reject" ? "Pending" : 
-                "Review",
-        screenedAt: new Date(),
-        lastRole: "Unknown",
-        resumeText: resumeText,
-        jobDescription: jobDescription,
-      }, screeningResult.recommendedAction);
+      try {
+        const newCandidate = addCandidate({
+          name: candidateName || "Unknown Candidate",
+          email: candidateEmail || "unknown@email.com",
+          role: candidateRole || "Unknown Role",
+          fitScore: screeningResult.fitScore,
+          fitCategory: screeningResult.fitCategory,
+          status: screeningResult.recommendedAction === "Interview" ? "Pending" : 
+                  screeningResult.recommendedAction === "Reject" ? "Pending" : 
+                  "Review",
+          screenedAt: new Date(),
+          lastRole: "Unknown",
+          resumeText: resumeText || "",
+          jobDescription: jobDescription || "",
+        }, screeningResult.recommendedAction);
+      } catch (error) {
+        console.error("Error adding candidate:", error);
+        // Continue even if adding candidate fails
+      }
       
       toast({
         title: "Analysis Complete",
