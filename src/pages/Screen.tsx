@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, type ChangeEvent, type DragEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -69,7 +69,7 @@ export default function Screen() {
     return result.value;
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -117,17 +117,17 @@ export default function Screen() {
     }
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: DragEvent) => {
     e.preventDefault();
     setIsDragOver(true);
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleDragLeave = (e: DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
   };
 
-  const handleDrop = async (e: React.DragEvent) => {
+  const handleDrop = async (e: DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
     
@@ -141,7 +141,7 @@ export default function Screen() {
         input.files = dataTransfer.files;
         
         // Trigger the change handler manually
-        const event = { target: input } as React.ChangeEvent<HTMLInputElement>;
+        const event = { target: input } as ChangeEvent<HTMLInputElement>;
         await handleFileUpload(event);
       }
     }
@@ -162,7 +162,7 @@ export default function Screen() {
   
     try {
       const response = await fetch(
-        "https://mancyram.app.n8n.cloud/webhook/b41ad258-86d3-42e3-9319-88271b95e5ab",
+        "https://mancyram.app.n8n.cloud/webhook-test/b41ad258-86d3-42e3-9319-88271b95e5ab",
         {
           method: "POST",
           headers: {
