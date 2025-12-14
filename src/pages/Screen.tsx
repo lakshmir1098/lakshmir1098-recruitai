@@ -1,5 +1,4 @@
 import { useState, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -157,50 +156,48 @@ export default function Screen() {
       });
       return;
     }
-
+  
     setIsAnalyzing(true);
     setResult(null);
-    setInviteSent(false);
-
+  
     try {
-      // Call Supabase Edge Function proxy for AI screening
-      const { data: screeningResult, error } = await supabase.functions.invoke('screen-candidate', {
-        body: { jobDescription, resumeText },
-      });
-
-      if (error) {
-        throw new Error(error.message);
+      const response = await fetch(
+        "https://mancyram.app.n8n.cloud/webhook/b41ad258-86d3-42e3-9319-88271b95e5ab",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            jd: jobDescription,
+            resume: resumeText,
+          }),
+        }
+      );
+  
+      if (!response.ok) {
+        throw new Error("n8n request failed");
       }
+  
+      const screeningResult = await response.json();
       setResult(screeningResult);
-
-      // Add to candidates list
-      addCandidate({
-        name: `Candidate ${Date.now().toString().slice(-4)}`,
-        email: `candidate${Date.now().toString().slice(-4)}@email.com`,
-        role: "Analyzed Role",
-        fitScore: screeningResult.fitScore,
-        fitCategory: screeningResult.fitCategory,
-        status: screeningResult.recommendedAction === "Interview" ? "Pending" : 
-                screeningResult.recommendedAction === "Review" ? "Review" : "Rejected",
-        screenedAt: new Date(),
-        lastRole: screeningResult.candidateSnapshot?.lastRole || "Unknown",
-      });
-
+  
       toast({
         title: "Analysis Complete",
-        description: `Fit score: ${screeningResult.fitScore}% - ${screeningResult.fitCategory} match`,
+        description: `Fit score: ${screeningResult.fitScore}%`,
       });
-    } catch (error) {
-      console.error("Screening error:", error);
+  
+    } catch (err) {
       toast({
         title: "Analysis Failed",
-        description: "An error occurred during screening. Please try again.",
+        description: "Could not reach screening service.",
         variant: "destructive",
       });
     } finally {
       setIsAnalyzing(false);
     }
   };
+  
 
   const handleSendInvite = async () => {
     await sendInterviewInvite("new-candidate");

@@ -20,7 +20,7 @@ serve(async (req) => {
     });
 
     // Forward request to n8n webhook (test mode)
-    const response = await fetch("https://mancyram.app.n8n.cloud/webhook-test/b41ad258-86d3-42e3-9319-88271b95e5ab", {
+    const response = await fetch("https://mancyram.app.n8n.cloud/webhook/b41ad258-86d3-42e3-9319-88271b95e5ab", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
