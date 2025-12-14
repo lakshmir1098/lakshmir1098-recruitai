@@ -17,6 +17,8 @@ export interface Candidate {
   status: "Pending" | "Invited" | "Rejected" | "Review";
   screenedAt: Date;
   lastRole: string;
+  resumeText?: string; // Store resume text for duplicate detection
+  jobDescription?: string; // Store job description for role tracking
 }
 
 export interface ActionItem {
@@ -86,17 +88,65 @@ export async function screenCandidate(
     recommendedAction,
     strengths: matchedSkills.length > 0 ? matchedSkills.slice(0, 4) : ["Communication", "Problem-solving"],
     gaps: missingSkills.length > 0 ? missingSkills.slice(0, 3) : ["No major gaps identified"],
-    candidateSnapshot: {
-      estimatedSeniority: fitScore >= 70 ? "Senior" : fitScore >= 50 ? "Mid-level" : "Junior",
-      yearsOfExperience: Math.floor(fitScore / 15) + 1,
-      lastRole: resumeLower.includes("engineer") ? "Software Engineer" : resumeLower.includes("manager") ? "Engineering Manager" : "Developer",
-    },
   };
 }
 
-export async function sendInterviewInvite(candidateId: string): Promise<{ success: boolean }> {
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-  return { success: true };
+// Webhook URLs - to be configured later
+const INVITE_WEBHOOK_URL = "https://mancyram.app.n8n.cloud/webhook/invite";
+const REJECT_WEBHOOK_URL = "https://mancyram.app.n8n.cloud/webhook/reject";
+
+export async function sendInterviewInvite(candidateId: string, candidateEmail?: string, candidateName?: string, role?: string): Promise<{ success: boolean }> {
+  try {
+    const response = await fetch(INVITE_WEBHOOK_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        candidateId,
+        candidateEmail,
+        candidateName,
+        role,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Invite webhook returned ${response.status}`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Invite webhook error:", error);
+    // Still return success to update UI, but log error
+    return { success: false };
+  }
+}
+
+export async function sendRejectionEmail(candidateId: string, candidateEmail?: string, candidateName?: string, role?: string): Promise<{ success: boolean }> {
+  try {
+    const response = await fetch(REJECT_WEBHOOK_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        candidateId,
+        candidateEmail,
+        candidateName,
+        role,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Reject webhook returned ${response.status}`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Reject webhook error:", error);
+    // Still return success to update UI, but log error
+    return { success: false };
+  }
 }
 
 // Mock data stores
@@ -157,14 +207,83 @@ export function getActionItems(): ActionItem[] {
   return actionItems;
 }
 
-export function addCandidate(candidate: Omit<Candidate, "id">) {
+// Check for duplicate resume submissions
+function findDuplicateResume(resumeText: string, email: string): Candidate | null {
+  return candidates.find(c => 
+    c.email === email && 
+    c.resumeText && 
+    c.resumeText.trim().toLowerCase() === resumeText.trim().toLowerCase()
+  ) || null;
+}
+
+export function addCandidate(candidate: Omit<Candidate, "id">, recommendedAction?: "Interview" | "Review" | "Reject") {
+  // Check for duplicate resume
+  const duplicate = candidate.resumeText 
+    ? findDuplicateResume(candidate.resumeText, candidate.email)
+    : null;
+  
+  if (duplicate && duplicate.role !== candidate.role) {
+    // Same resume submitted for different role - add to action items
+    actionItems = [
+      {
+        id: Date.now().toString(),
+        type: "duplicate",
+        candidateName: candidate.name,
+        candidateId: duplicate.id,
+        role: `${duplicate.role} → ${candidate.role}`,
+        message: `Duplicate resume detected. Previously applied for ${duplicate.role}`,
+        priority: "medium",
+        createdAt: new Date(),
+      },
+      ...actionItems,
+    ];
+  }
+  
   const newCandidate: Candidate = {
     ...candidate,
     id: Date.now().toString(),
   };
   candidates = [newCandidate, ...candidates];
   
-  if (candidate.fitCategory === "Medium") {
+  // Determine action type based on recommendedAction or fitScore
+  const actionType = recommendedAction || 
+    (candidate.fitScore >= 90 ? "Interview" : 
+     candidate.fitScore < 40 ? "Reject" : "Review");
+  
+  // Add to action items based on recommended action
+  // This ensures candidates appear in Action Items if not handled in screening results
+  if (actionType === "Interview") {
+    // Add action item for invite
+    actionItems = [
+      {
+        id: Date.now().toString(),
+        type: "review", // Using review type but with invite action
+        candidateName: candidate.name,
+        candidateId: newCandidate.id,
+        role: candidate.role,
+        message: `AI recommends Interview - ${candidate.fitScore}% fit score`,
+        priority: candidate.fitScore >= 90 ? "high" : "medium",
+        createdAt: new Date(),
+      },
+      ...actionItems,
+    ];
+  } else if (actionType === "Reject") {
+    // Add action item for reject
+    actionItems = [
+      {
+        id: Date.now().toString(),
+        type: "review", // Using review type but with reject action
+        candidateName: candidate.name,
+        candidateId: newCandidate.id,
+        role: candidate.role,
+        message: `AI recommends Reject - ${candidate.fitScore}% fit score`,
+        priority: "medium",
+        createdAt: new Date(),
+      },
+      ...actionItems,
+    ];
+  } else {
+    // Review case - add action item
     actionItems = [
       {
         id: Date.now().toString(),
@@ -172,8 +291,8 @@ export function addCandidate(candidate: Omit<Candidate, "id">) {
         candidateName: candidate.name,
         candidateId: newCandidate.id,
         role: candidate.role,
-        message: "Medium-fit candidate requires manual review",
-        priority: "medium",
+        message: `Candidate with ${candidate.fitScore}% fit score requires manual review`,
+        priority: candidate.fitScore >= 70 ? "high" : "medium",
         createdAt: new Date(),
       },
       ...actionItems,

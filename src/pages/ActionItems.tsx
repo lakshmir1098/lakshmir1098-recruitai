@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getActionItems, updateCandidateStatus, getCandidates, type ActionItem } from "@/lib/mock-api";
-import { AlertCircle, Clock, Copy, UserX, CheckCircle, Mail, XCircle } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { getActionItems, updateCandidateStatus, getCandidates, sendInterviewInvite, sendRejectionEmail, type ActionItem } from "@/lib/mock-api";
+import { AlertCircle, Clock, Copy, UserX, CheckCircle, Mail, XCircle, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -11,6 +12,14 @@ import { cn } from "@/lib/utils";
 export default function ActionItems() {
   const [actionItems, setActionItems] = useState<ActionItem[]>(getActionItems());
   const { toast } = useToast();
+
+  // Calculate summary stats
+  const stats = {
+    open: actionItems.length,
+    highPriority: actionItems.filter(item => item.priority === "high").length,
+    needReview: actionItems.filter(item => item.type === "review").length,
+    awaitingReply: actionItems.filter(item => item.type === "response").length,
+  };
 
   const getTypeIcon = (type: ActionItem["type"]) => {
     switch (type) {
@@ -49,22 +58,94 @@ export default function ActionItems() {
     }
   };
 
-  const handleResolve = (item: ActionItem, action: "invite" | "reject") => {
-    updateCandidateStatus(item.candidateId, action === "invite" ? "Invited" : "Rejected");
-    setActionItems(getActionItems());
-    toast({
-      title: action === "invite" ? "Interview Invite Sent" : "Candidate Rejected",
-      description: `Action completed for ${item.candidateName}`,
-    });
+  // Determine which buttons to show based on message content
+  const getRecommendedAction = (message: string): "Interview" | "Reject" | "Review" => {
+    if (message.includes("AI recommends Interview")) return "Interview";
+    if (message.includes("AI recommends Reject")) return "Reject";
+    return "Review";
+  };
+
+  const handleResolve = async (item: ActionItem, action: "invite" | "reject") => {
+    try {
+      const candidates = getCandidates();
+      const candidate = candidates.find(c => c.id === item.candidateId);
+      
+      if (action === "invite") {
+        await sendInterviewInvite(
+          item.candidateId,
+          candidate?.email,
+          item.candidateName,
+          item.role
+        );
+        updateCandidateStatus(item.candidateId, "Invited");
+        toast({
+          title: "Interview Invite Sent",
+          description: `${item.candidateName} has been notified via email.`,
+        });
+      } else {
+        await sendRejectionEmail(
+          item.candidateId,
+          candidate?.email,
+          item.candidateName,
+          item.role
+        );
+        updateCandidateStatus(item.candidateId, "Rejected");
+        toast({
+          title: "Rejection Email Sent",
+          description: `${item.candidateName} has been notified.`,
+          variant: "destructive",
+        });
+      }
+      
+      setActionItems(getActionItems());
+    } catch (error) {
+      console.error("Action error:", error);
+      toast({
+        title: "Error",
+        description: `Failed to ${action === "invite" ? "send invite" : "send rejection email"}. Please try again.`,
+        variant: "destructive",
+      });
+    }
   };
 
   return (
     <div className="container py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground">Action Items</h1>
+        <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+          <AlertCircle className="h-8 w-8" />
+          Action Items
+        </h1>
         <p className="text-muted-foreground mt-1">
-          Items requiring your attention
+          Items that require your attention or action
         </p>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Card className="shadow-sm">
+          <CardContent className="pt-6">
+            <div className="text-3xl font-bold">{stats.open}</div>
+            <div className="text-sm text-muted-foreground mt-1">Open Items</div>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardContent className="pt-6">
+            <div className="text-3xl font-bold">{stats.highPriority}</div>
+            <div className="text-sm text-muted-foreground mt-1">High Priority</div>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardContent className="pt-6">
+            <div className="text-3xl font-bold">{stats.needReview}</div>
+            <div className="text-sm text-muted-foreground mt-1">Need Review</div>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardContent className="pt-6">
+            <div className="text-3xl font-bold">{stats.awaitingReply}</div>
+            <div className="text-sm text-muted-foreground mt-1">Awaiting Reply</div>
+          </CardContent>
+        </Card>
       </div>
 
       {actionItems.length === 0 ? (
@@ -80,60 +161,87 @@ export default function ActionItems() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {actionItems.map((item) => (
-            <Card key={item.id} className="shadow-sm">
-              <CardContent className="pt-6">
-                <div className="flex flex-col md:flex-row md:items-center gap-4">
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className={cn(
-                      "p-2 rounded-lg",
-                      item.priority === "high" && "bg-destructive/10 text-destructive",
-                      item.priority === "medium" && "bg-warning/10 text-warning",
-                      item.priority === "low" && "bg-secondary text-muted-foreground"
-                    )}>
-                      {getTypeIcon(item.type)}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-semibold text-foreground">{item.candidateName}</span>
-                        <Badge className={getPriorityColor(item.priority)}>
-                          {item.priority}
-                        </Badge>
-                      </div>
-                      <p className="text-muted-foreground text-sm">{item.message}</p>
-                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                        <span>{item.role}</span>
-                        <span>•</span>
+        <Card className="shadow-sm">
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Priority</TableHead>
+                  <TableHead>Candidate</TableHead>
+                  <TableHead>Job</TableHead>
+                  <TableHead>Issue Type</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {actionItems.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>
+                      <Badge className={getPriorityColor(item.priority)}>
+                        {item.priority}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">{item.candidateName}</TableCell>
+                    <TableCell>{item.role}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {getTypeIcon(item.type)}
                         <span>{getTypeLabel(item.type)}</span>
-                        <span>•</span>
-                        <span>{format(item.createdAt, "MMM d, yyyy")}</span>
                       </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 ml-auto">
-                    <Button
-                      size="sm"
-                      className="bg-accent hover:bg-accent/90"
-                      onClick={() => handleResolve(item, "invite")}
-                    >
-                      <Mail className="h-4 w-4 mr-1" />
-                      Invite
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleResolve(item, "reject")}
-                    >
-                      <XCircle className="h-4 w-4 mr-1" />
-                      Reject
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm max-w-md">
+                      {item.message}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {format(item.createdAt, "dd/MM/yyyy")}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {(() => {
+                          const recommendedAction = getRecommendedAction(item.message);
+                          // Show Invite button if AI recommends Interview or Review
+                          const showInvite = recommendedAction === "Interview" || recommendedAction === "Review";
+                          // Show Reject button if AI recommends Reject or Review
+                          const showReject = recommendedAction === "Reject" || recommendedAction === "Review";
+                          
+                          return (
+                            <>
+                              {showInvite && (
+                                <Button
+                                  size="sm"
+                                  className="bg-accent hover:bg-accent/90"
+                                  onClick={() => handleResolve(item, "invite")}
+                                >
+                                  <Mail className="h-4 w-4 mr-1" />
+                                  Invite
+                                </Button>
+                              )}
+                              {showReject && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleResolve(item, "reject")}
+                                >
+                                  <XCircle className="h-4 w-4 mr-1" />
+                                  Reject
+                                </Button>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
