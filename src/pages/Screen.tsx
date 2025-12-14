@@ -39,6 +39,7 @@ export default function Screen() {
   const [inviteSent, setInviteSent] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isParsingFile, setIsParsingFile] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -113,6 +114,36 @@ export default function Screen() {
     setResumeText("");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      // Create a synthetic event to reuse handleFileUpload logic
+      const input = fileInputRef.current;
+      if (input) {
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        input.files = dataTransfer.files;
+        
+        // Trigger the change handler manually
+        const event = { target: input } as React.ChangeEvent<HTMLInputElement>;
+        await handleFileUpload(event);
+      }
     }
   };
 
@@ -243,37 +274,69 @@ export default function Screen() {
             <CardDescription>Upload or paste the candidate's resume</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* File Upload Section */}
-            <div className="space-y-2">
-              <Label>Upload Resume File</Label>
-              <div className="flex items-center gap-2">
-                <Input
+            {/* Drag and Drop Upload Zone */}
+            {!uploadedFile ? (
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={cn(
+                  "relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200",
+                  isDragOver 
+                    ? "border-primary bg-primary/5" 
+                    : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50"
+                )}
+              >
+                <input
                   ref={fileInputRef}
                   type="file"
                   accept=".pdf,.docx,.doc,.txt,.md,.rtf"
                   onChange={handleFileUpload}
-                  className="flex-1"
+                  className="hidden"
                   disabled={isParsingFile}
                 />
-              </div>
-              {uploadedFile && (
-                <div className="flex items-center gap-2 p-2 bg-secondary rounded-md">
-                  <FileText className="h-4 w-4 text-primary" />
-                  <span className="text-sm flex-1 truncate">{uploadedFile.name}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearUploadedFile}
-                    className="h-6 w-6 p-0"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                <div className="flex flex-col items-center gap-3">
+                  <div className={cn(
+                    "p-4 rounded-full transition-colors",
+                    isDragOver ? "bg-primary/10" : "bg-muted"
+                  )}>
+                    <Upload className={cn(
+                      "h-8 w-8 transition-colors",
+                      isDragOver ? "text-primary" : "text-muted-foreground"
+                    )} />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">
+                      {isParsingFile ? "Extracting text..." : "Drop resume here or click to upload"}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Supports PDF, DOCX, DOC, TXT, MD
+                    </p>
+                  </div>
                 </div>
-              )}
-              {isParsingFile && (
-                <p className="text-sm text-muted-foreground">Extracting text from file...</p>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 p-4 bg-secondary rounded-lg border border-border">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <FileText className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{uploadedFile.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {(uploadedFile.size / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearUploadedFile}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
