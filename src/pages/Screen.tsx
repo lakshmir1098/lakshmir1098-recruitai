@@ -163,7 +163,7 @@ export default function Screen() {
 
     try {
       // Call n8n webhook for AI screening
-      const response = await fetch("https://mancyram.app.n8n.cloud/webhook/api/recruitai/analyze", {
+      const response = await fetch("https://mancyram.app.n8n.cloud/webhook/recruitai/screen", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
