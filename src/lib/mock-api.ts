@@ -1,12 +1,11 @@
-export interface ScreeningResult {
+export type ScreeningResult = {
   fitScore: number;
   fitCategory: "Strong" | "Medium" | "Low";
   screeningSummary: string;
-  recommendedAction: "Interview" | "Review" | "Reject";
   strengths: string[];
   gaps: string[];
-  
-}
+  recommendedAction: "Interview" | "Review" | "Reject";
+};
 
 export interface Candidate {
   id: string;

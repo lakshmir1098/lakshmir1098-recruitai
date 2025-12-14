@@ -23,7 +23,7 @@ import {
   FileText,
   X
 } from "lucide-react";
-import { screenCandidate, sendInterviewInvite, addCandidate, type ScreeningResult } from "@/lib/mock-api";
+import { sendInterviewInvite, type ScreeningResult } from "@/lib/mock-api";
 import { cn } from "@/lib/utils";
 import mammoth from "mammoth";
 import * as pdfjsLib from "pdfjs-dist";
@@ -159,6 +159,7 @@ export default function Screen() {
   
     setIsAnalyzing(true);
     setResult(null);
+    setInviteSent(false);
   
     try {
       const response = await fetch(
@@ -176,23 +177,47 @@ export default function Screen() {
       );
   
       if (!response.ok) {
-        throw new Error("n8n request failed");
+        const errorText = await response.text().catch(() => "Unknown error");
+        console.error("n8n webhook error:", response.status, response.statusText, errorText);
+        throw new Error(`n8n webhook returned ${response.status}: ${response.statusText}`);
       }
   
-      const screeningResult = await response.json();
+      const raw = await response.json();
+      
+      const screeningResult: ScreeningResult = {
+        fitScore: Number(raw.fitScore),
+        fitCategory: raw.fitCategory,
+        screeningSummary: raw.screeningSummary,
+        strengths: Array.isArray(raw.strengths) ? raw.strengths : [],
+        gaps: Array.isArray(raw.gaps) ? raw.gaps : [],
+        recommendedAction: raw.recommendedAction,
+      };
+      
       setResult(screeningResult);
-  
+        
       toast({
         title: "Analysis Complete",
         description: `Fit score: ${screeningResult.fitScore}%`,
       });
   
     } catch (err) {
-      toast({
-        title: "Analysis Failed",
-        description: "Could not reach screening service.",
-        variant: "destructive",
-      });
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      console.error("Screening error:", err);
+      
+      // Check for CORS or network errors
+      if (errorMessage.includes("Failed to fetch") || errorMessage.includes("NetworkError") || errorMessage.includes("CORS")) {
+        toast({
+          title: "Connection Failed",
+          description: "Cannot connect to n8n. This may be a CORS issue. Check browser console for details.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Analysis Failed",
+          description: errorMessage || "Could not reach screening service.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsAnalyzing(false);
     }
@@ -400,7 +425,7 @@ export default function Screen() {
       </div>
 
       {/* Results Section */}
-      {result && (
+      {result && typeof result.fitScore === "number" && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <Separator />
           
@@ -495,37 +520,7 @@ export default function Screen() {
             </Card>
           </div>
 
-          {/* Candidate Snapshot */}
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg">Candidate Snapshot</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid sm:grid-cols-3 gap-4">
-                <div className="flex items-center gap-3 p-3 bg-secondary rounded-lg">
-                  <Briefcase className="h-5 w-5 text-primary" />
-                  <div>
-                    <div className="text-sm text-muted-foreground">Last Role</div>
-                    <div className="font-medium">{result.candidateSnapshot.lastRole}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-secondary rounded-lg">
-                  <Clock className="h-5 w-5 text-primary" />
-                  <div>
-                    <div className="text-sm text-muted-foreground">Experience</div>
-                    <div className="font-medium">{result.candidateSnapshot.yearsOfExperience} years</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-secondary rounded-lg">
-                  <TrendingUp className="h-5 w-5 text-primary" />
-                  <div>
-                    <div className="text-sm text-muted-foreground">Seniority</div>
-                    <div className="font-medium">{result.candidateSnapshot.estimatedSeniority}</div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          
 
           {/* Action Buttons */}
           <Card className="shadow-sm">
