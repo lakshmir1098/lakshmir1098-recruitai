@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
 import { 
   FileSearch, 
   Upload, 
@@ -18,10 +19,17 @@ import {
   TrendingUp,
   TrendingDown,
   Briefcase,
-  Clock
+  Clock,
+  FileText,
+  X
 } from "lucide-react";
 import { screenCandidate, sendInterviewInvite, addCandidate, type ScreeningResult } from "@/lib/mock-api";
 import { cn } from "@/lib/utils";
+import mammoth from "mammoth";
+import * as pdfjsLib from "pdfjs-dist";
+
+// Set PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
 export default function Screen() {
   const [jobDescription, setJobDescription] = useState("");
@@ -29,10 +37,84 @@ export default function Screen() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<ScreeningResult | null>(null);
   const [inviteSent, setInviteSent] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [isParsingFile, setIsParsingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const jdValid = jobDescription.length >= 100;
   const resumeValid = resumeText.length >= 50;
+
+  const extractTextFromPdf = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = "";
+    
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(" ");
+      fullText += pageText + "\n";
+    }
+    
+    return fullText;
+  };
+
+  const extractTextFromDocx = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value;
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadedFile(file);
+    setIsParsingFile(true);
+
+    try {
+      let extractedText = "";
+      const fileName = file.name.toLowerCase();
+
+      if (fileName.endsWith(".txt") || fileName.endsWith(".md")) {
+        extractedText = await file.text();
+      } else if (fileName.endsWith(".pdf")) {
+        extractedText = await extractTextFromPdf(file);
+      } else if (fileName.endsWith(".docx") || fileName.endsWith(".doc")) {
+        extractedText = await extractTextFromDocx(file);
+      } else {
+        // Try to read as text for other formats
+        extractedText = await file.text();
+      }
+
+      setResumeText(extractedText.trim());
+      toast({
+        title: "Resume Uploaded",
+        description: `Successfully extracted text from ${file.name}`,
+      });
+    } catch (error) {
+      console.error("Error parsing file:", error);
+      toast({
+        title: "Parsing Error",
+        description: "Could not extract text from the file. Please try pasting the content manually.",
+        variant: "destructive",
+      });
+      setUploadedFile(null);
+    } finally {
+      setIsParsingFile(false);
+    }
+  };
+
+  const clearUploadedFile = () => {
+    setUploadedFile(null);
+    setResumeText("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   const handleAnalyze = async () => {
     if (!jdValid || !resumeValid) {
@@ -160,14 +242,55 @@ export default function Screen() {
             </CardTitle>
             <CardDescription>Upload or paste the candidate's resume</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {/* File Upload Section */}
+            <div className="space-y-2">
+              <Label>Upload Resume File</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx,.doc,.txt,.md,.rtf"
+                  onChange={handleFileUpload}
+                  className="flex-1"
+                  disabled={isParsingFile}
+                />
+              </div>
+              {uploadedFile && (
+                <div className="flex items-center gap-2 p-2 bg-secondary rounded-md">
+                  <FileText className="h-4 w-4 text-primary" />
+                  <span className="text-sm flex-1 truncate">{uploadedFile.name}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearUploadedFile}
+                    className="h-6 w-6 p-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              {isParsingFile && (
+                <p className="text-sm text-muted-foreground">Extracting text from file...</p>
+              )}
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">Or paste content</span>
+              </div>
+            </div>
+
             <Textarea
               placeholder="Paste the resume content here, or describe the candidate's experience..."
               value={resumeText}
               onChange={(e) => setResumeText(e.target.value)}
-              className="min-h-[300px] resize-none"
+              className="min-h-[250px] resize-none"
             />
-            <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center justify-between">
               <span className={cn(
                 "text-sm",
                 resumeValid ? "text-accent" : "text-muted-foreground"
@@ -359,6 +482,10 @@ export default function Screen() {
                     setJobDescription("");
                     setResumeText("");
                     setInviteSent(false);
+                    setUploadedFile(null);
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = "";
+                    }
                   }}
                 >
                   Screen Another Candidate
