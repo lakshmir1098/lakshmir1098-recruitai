@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Settings as SettingsIcon, Bell, Database } from "lucide-react";
+import { getSettings, saveSettings } from "@/lib/settings-store";
 
 export default function Settings() {
   const [autoInviteStrong, setAutoInviteStrong] = useState(true);
@@ -17,6 +18,36 @@ export default function Settings() {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [dataRetention, setDataRetention] = useState("90");
   const { toast } = useToast();
+
+  // Load settings on mount
+  useEffect(() => {
+    const settings = getSettings();
+    setAutoInviteStrong(settings.autoInviteEnabled);
+    setAutoRejectLow(settings.autoRejectEnabled);
+  }, []);
+
+  // Save automation settings immediately on toggle
+  const handleAutoInviteChange = (checked: boolean) => {
+    setAutoInviteStrong(checked);
+    saveSettings({ autoInviteEnabled: checked });
+    toast({
+      title: checked ? "Auto-Invite Enabled" : "Auto-Invite Disabled",
+      description: checked 
+        ? "Candidates with 90%+ score will be auto-invited." 
+        : "High-scoring candidates will require manual review.",
+    });
+  };
+
+  const handleAutoRejectChange = (checked: boolean) => {
+    setAutoRejectLow(checked);
+    saveSettings({ autoRejectEnabled: checked });
+    toast({
+      title: checked ? "Auto-Reject Enabled" : "Auto-Reject Disabled",
+      description: checked 
+        ? "Candidates with ≤40% score will be auto-rejected." 
+        : "Low-scoring candidates will require manual review.",
+    });
+  };
 
   const handleSave = () => {
     toast({
@@ -51,26 +82,26 @@ export default function Settings() {
               <div className="space-y-0.5">
                 <Label>Auto-invite high scorers (≥90%)</Label>
                 <p className="text-sm text-muted-foreground">
-                  Automatically send interview invites and trigger webhook for candidates with 90%+ fit
+                  Automatically send interview invites and trigger email workflow for candidates with 90%+ fit
                 </p>
               </div>
-              <Switch checked={autoInviteStrong} onCheckedChange={setAutoInviteStrong} />
+              <Switch checked={autoInviteStrong} onCheckedChange={handleAutoInviteChange} />
             </div>
             <Separator />
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label>Auto-reject low scorers (≤40%)</Label>
                 <p className="text-sm text-muted-foreground">
-                  Automatically reject and trigger webhook for candidates with 40% or lower fit
+                  Automatically reject and trigger email workflow for candidates with 40% or lower fit
                 </p>
               </div>
-              <Switch checked={autoRejectLow} onCheckedChange={setAutoRejectLow} />
+              <Switch checked={autoRejectLow} onCheckedChange={handleAutoRejectChange} />
             </div>
             <Separator />
             <div className="p-4 bg-secondary rounded-lg">
               <p className="text-sm text-muted-foreground">
-                <strong>Score 41-89%:</strong> Candidates in this range are added to Action Items for manual review.
-                You can invite or reject them from the Action Items page.
+                <strong>Score 41-89%:</strong> Candidates in this range are added to Candidates for manual review.
+                You can invite or reject them from the Candidates page.
               </p>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">

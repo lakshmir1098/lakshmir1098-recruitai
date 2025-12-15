@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { addCandidate, type ScreeningResult, type Candidate } from "@/lib/mock-api";
 import { triggerInviteWebhook, triggerRejectWebhook } from "@/lib/webhook-store";
+import { isAutoInviteEnabled, isAutoRejectEnabled } from "@/lib/settings-store";
 import { cn } from "@/lib/utils";
 import { AnalysisProgress } from "@/components/AnalysisProgress";
 import mammoth from "mammoth";
@@ -183,8 +184,12 @@ export default function Screen() {
   };
 
   const determineStatus = (score: number): Candidate["status"] => {
-    if (score >= 90) return "Invited";
-    if (score <= 40) return "Rejected";
+    // Check settings to determine if auto-invite/auto-reject is enabled
+    const autoInvite = isAutoInviteEnabled();
+    const autoReject = isAutoRejectEnabled();
+    
+    if (score >= 90 && autoInvite) return "Invited";
+    if (score <= 40 && autoReject) return "Rejected";
     return "Review";
   };
 
@@ -299,9 +304,19 @@ export default function Screen() {
         }
       } else {
         setProcessedStatus("review");
+        const score = screeningResult.fitScore;
+        let message = `${candidateName} added to Candidates for manual review.`;
+        
+        // Provide context if auto-actions were disabled
+        if (score >= 90 && !isAutoInviteEnabled()) {
+          message = `${candidateName} scored 90%+ but auto-invite is disabled. Added to Candidates for manual review.`;
+        } else if (score <= 40 && !isAutoRejectEnabled()) {
+          message = `${candidateName} scored ≤40% but auto-reject is disabled. Added to Candidates for manual review.`;
+        }
+        
         toast({
-          title: "Review Needed (41-89% Score)",
-          description: `${candidateName} added to Candidates for manual review.`,
+          title: "Review Needed",
+          description: message,
         });
       }
   
