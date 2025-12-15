@@ -1,13 +1,12 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { FileSearch, Users, ListChecks, Settings, LogOut } from "lucide-react";
+import { FileSearch, Users, Settings, LogOut } from "lucide-react";
 import logo from "@/assets/logo.png";
 
 const navItems = [
   { label: "Screening", path: "/screen", icon: FileSearch },
   { label: "Candidates", path: "/candidates", icon: Users },
-  { label: "Action Items", path: "/action-items", icon: ListChecks },
   { label: "Settings", path: "/settings", icon: Settings },
 ];
 
