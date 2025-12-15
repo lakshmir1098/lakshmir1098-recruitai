@@ -71,13 +71,32 @@ serve(async (req) => {
       body: JSON.stringify({ jd: jobDescription, resume: resumeText }),
     });
 
+    console.log("n8n response status:", response.status, response.statusText);
+
     if (!response.ok) {
-      console.error("n8n webhook error:", response.status, response.statusText);
-      throw new Error(`n8n webhook returned ${response.status}`);
+      const errorText = await response.text().catch(() => "No response body");
+      console.error("n8n webhook error:", response.status, response.statusText, errorText);
+      throw new Error(`n8n webhook returned ${response.status}: ${errorText}`);
     }
 
-    const data = await response.json();
-    console.log("n8n response received for user:", user.id);
+    // Safely parse the response - handle empty or invalid JSON
+    const responseText = await response.text();
+    console.log("n8n raw response length:", responseText.length);
+    
+    if (!responseText || responseText.trim() === '') {
+      console.error("n8n returned empty response");
+      throw new Error("n8n webhook returned empty response. Please check if the n8n workflow is active.");
+    }
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Failed to parse n8n response:", responseText.substring(0, 500));
+      throw new Error("n8n webhook returned invalid JSON. Please check the n8n workflow configuration.");
+    }
+
+    console.log("n8n response parsed successfully for user:", user.id);
 
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
