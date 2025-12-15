@@ -1,5 +1,5 @@
 // n8n webhook URLs for invite and reject workflows
-const INVITE_WEBHOOK_URL = "https://mancyram.app.n8n.cloud/webhook/invite";
+const INVITE_WEBHOOK_URL = "https://mancyram.app.n8n.cloud/webhook/api/recruitai/action/invite";
 const REJECT_WEBHOOK_URL = "https://mancyram.app.n8n.cloud/webhook/reject";
 
 export async function triggerInviteWebhook(candidateData: {
