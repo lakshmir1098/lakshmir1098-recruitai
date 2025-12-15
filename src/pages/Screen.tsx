@@ -76,6 +76,7 @@ interface ScreeningSession {
   result: ScreeningResult | null;
   processedStatus: "invited" | "rejected" | "review" | null;
   addedCandidateId: string | null;
+  uploadedFileName: string | null;
 }
 
 const getStoredSession = (): ScreeningSession | null => {
@@ -112,6 +113,7 @@ export default function Screen() {
   const [result, setResult] = useState<ScreeningResult | null>(storedSession?.result || null);
   const [processedStatus, setProcessedStatus] = useState<"invited" | "rejected" | "review" | null>(storedSession?.processedStatus || null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(storedSession?.uploadedFileName || null);
   const [isParsingFile, setIsParsingFile] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [addedCandidateId, setAddedCandidateId] = useState<string | null>(storedSession?.addedCandidateId || null);
@@ -130,8 +132,9 @@ export default function Screen() {
       result,
       processedStatus,
       addedCandidateId,
+      uploadedFileName,
     });
-  }, [jobDescription, resumeText, candidateName, candidateEmail, roleTitle, result, processedStatus, addedCandidateId]);
+  }, [jobDescription, resumeText, candidateName, candidateEmail, roleTitle, result, processedStatus, addedCandidateId, uploadedFileName]);
 
   const jdValid = jobDescription.length >= 100;
   const resumeValid = resumeText.length >= 50;
@@ -167,6 +170,7 @@ export default function Screen() {
     if (!file) return;
 
     setUploadedFile(file);
+    setUploadedFileName(file.name);
     setIsParsingFile(true);
 
     try {
@@ -203,6 +207,7 @@ export default function Screen() {
 
   const clearUploadedFile = () => {
     setUploadedFile(null);
+    setUploadedFileName(null);
     setResumeText("");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -404,6 +409,7 @@ export default function Screen() {
     setRoleTitle("");
     setProcessedStatus(null);
     setUploadedFile(null);
+    setUploadedFileName(null);
     setAddedCandidateId(null);
     clearSession();
     if (fileInputRef.current) {
@@ -602,7 +608,7 @@ export default function Screen() {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Drag and Drop Upload Zone */}
-            {!uploadedFile ? (
+            {!uploadedFile && !uploadedFileName ? (
               <div
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -649,10 +655,12 @@ export default function Screen() {
                   <FileText className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{uploadedFile.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {(uploadedFile.size / 1024).toFixed(1)} KB
-                  </p>
+                  <p className="font-medium truncate">{uploadedFile?.name || uploadedFileName}</p>
+                  {uploadedFile && (
+                    <p className="text-sm text-muted-foreground">
+                      {(uploadedFile.size / 1024).toFixed(1)} KB
+                    </p>
+                  )}
                 </div>
                 <Button
                   variant="ghost"
