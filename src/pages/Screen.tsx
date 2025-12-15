@@ -1,4 +1,4 @@
-import { useState, useRef, type ChangeEvent, type DragEvent } from "react";
+import { useState, useRef, useEffect, type ChangeEvent, type DragEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,7 +21,8 @@ import {
   TrendingDown,
   FileText,
   X,
-  Eye
+  Eye,
+  Loader2
 } from "lucide-react";
 import { addCandidate, type Candidate, type FitCategory, type CandidateStatus } from "@/lib/candidates-db";
 import { type ScreeningResult } from "@/lib/mock-api";
@@ -63,22 +64,73 @@ We are looking for a Senior Software Engineer with strong experience in full-sta
 - Contributions to open-source projects
 `;
 
+const SESSION_STORAGE_KEY = "recruitai_screening_session";
+
+interface ScreeningSession {
+  jobDescription: string;
+  resumeText: string;
+  candidateName: string;
+  candidateEmail: string;
+  roleTitle: string;
+  result: ScreeningResult | null;
+  processedStatus: "invited" | "rejected" | "review" | null;
+  addedCandidateId: string | null;
+}
+
+const getStoredSession = (): ScreeningSession | null => {
+  try {
+    const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+};
+
+const saveSession = (session: ScreeningSession) => {
+  try {
+    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  } catch (e) {
+    console.error("Error saving session:", e);
+  }
+};
+
+const clearSession = () => {
+  sessionStorage.removeItem(SESSION_STORAGE_KEY);
+};
+
 export default function Screen() {
   const navigate = useNavigate();
-  const [jobDescription, setJobDescription] = useState("");
-  const [resumeText, setResumeText] = useState("");
-  const [candidateName, setCandidateName] = useState("");
-  const [candidateEmail, setCandidateEmail] = useState("");
-  const [roleTitle, setRoleTitle] = useState("");
+  const storedSession = getStoredSession();
+  
+  const [jobDescription, setJobDescription] = useState(storedSession?.jobDescription || "");
+  const [resumeText, setResumeText] = useState(storedSession?.resumeText || "");
+  const [candidateName, setCandidateName] = useState(storedSession?.candidateName || "");
+  const [candidateEmail, setCandidateEmail] = useState(storedSession?.candidateEmail || "");
+  const [roleTitle, setRoleTitle] = useState(storedSession?.roleTitle || "");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [result, setResult] = useState<ScreeningResult | null>(null);
-  const [processedStatus, setProcessedStatus] = useState<"invited" | "rejected" | "review" | null>(null);
+  const [result, setResult] = useState<ScreeningResult | null>(storedSession?.result || null);
+  const [processedStatus, setProcessedStatus] = useState<"invited" | "rejected" | "review" | null>(storedSession?.processedStatus || null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isParsingFile, setIsParsingFile] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [addedCandidateId, setAddedCandidateId] = useState<string | null>(null);
+  const [addedCandidateId, setAddedCandidateId] = useState<string | null>(storedSession?.addedCandidateId || null);
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  // Persist session data when form changes
+  useEffect(() => {
+    saveSession({
+      jobDescription,
+      resumeText,
+      candidateName,
+      candidateEmail,
+      roleTitle,
+      result,
+      processedStatus,
+      addedCandidateId,
+    });
+  }, [jobDescription, resumeText, candidateName, candidateEmail, roleTitle, result, processedStatus, addedCandidateId]);
 
   const jdValid = jobDescription.length >= 100;
   const resumeValid = resumeText.length >= 50;
@@ -357,8 +409,79 @@ export default function Screen() {
     setProcessedStatus(null);
     setUploadedFile(null);
     setAddedCandidateId(null);
+    clearSession();
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  };
+
+  const handleManualInvite = async () => {
+    if (!addedCandidateId) return;
+    
+    setIsProcessingAction(true);
+    try {
+      const { updateCandidateStatus } = await import("@/lib/candidates-db");
+      const webhookData = {
+        name: candidateName,
+        email: candidateEmail,
+        role: roleTitle,
+        fitScore: result?.fitScore || 0,
+      };
+      
+      const webhookResult = await triggerInviteWebhook(webhookData);
+      await updateCandidateStatus(addedCandidateId, "Invited", "Manually invited after screening");
+      
+      setProcessedStatus("invited");
+      toast({
+        title: "Candidate Invited",
+        description: webhookResult.success 
+          ? `${candidateName} has been invited. Email workflow triggered.`
+          : `${candidateName} marked as invited.`,
+      });
+    } catch (error) {
+      console.error("Error inviting candidate:", error);
+      toast({
+        title: "Error",
+        description: "Failed to invite candidate. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
+
+  const handleManualReject = async () => {
+    if (!addedCandidateId) return;
+    
+    setIsProcessingAction(true);
+    try {
+      const { updateCandidateStatus } = await import("@/lib/candidates-db");
+      const webhookData = {
+        name: candidateName,
+        email: candidateEmail,
+        role: roleTitle,
+        fitScore: result?.fitScore || 0,
+      };
+      
+      const webhookResult = await triggerRejectWebhook(webhookData);
+      await updateCandidateStatus(addedCandidateId, "Rejected", "Manually rejected after screening");
+      
+      setProcessedStatus("rejected");
+      toast({
+        title: "Candidate Rejected",
+        description: webhookResult.success 
+          ? `${candidateName} has been rejected. Email workflow triggered.`
+          : `${candidateName} marked as rejected.`,
+      });
+    } catch (error) {
+      console.error("Error rejecting candidate:", error);
+      toast({
+        title: "Error",
+        description: "Failed to reject candidate. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingAction(false);
     }
   };
 
@@ -759,6 +882,37 @@ export default function Screen() {
           <Card className="shadow-sm">
             <CardContent className="pt-6">
               <div className="flex flex-wrap gap-4 justify-center">
+                {/* Show manual invite/reject buttons when status is "review" */}
+                {processedStatus === "review" && (
+                  <>
+                    <Button 
+                      size="lg" 
+                      onClick={handleManualInvite}
+                      disabled={isProcessingAction}
+                      className="bg-accent text-accent-foreground hover:bg-accent/90"
+                    >
+                      {isProcessingAction ? (
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                      ) : (
+                        <Mail className="h-5 w-5 mr-2" />
+                      )}
+                      Invite Candidate
+                    </Button>
+                    <Button 
+                      variant="destructive"
+                      size="lg" 
+                      onClick={handleManualReject}
+                      disabled={isProcessingAction}
+                    >
+                      {isProcessingAction ? (
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                      ) : (
+                        <XCircle className="h-5 w-5 mr-2" />
+                      )}
+                      Reject Candidate
+                    </Button>
+                  </>
+                )}
                 <Button variant="outline" size="lg" onClick={() => navigate("/candidates")}>
                   <Eye className="h-5 w-5 mr-2" />
                   View All Candidates
