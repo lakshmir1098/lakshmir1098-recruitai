@@ -1,4 +1,5 @@
 import { useState, useRef, type ChangeEvent, type DragEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -6,8 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 import { 
   FileSearch, 
   Upload, 
@@ -18,12 +19,12 @@ import {
   Mail,
   TrendingUp,
   TrendingDown,
-  Briefcase,
-  Clock,
   FileText,
-  X
+  X,
+  Eye
 } from "lucide-react";
-import { sendInterviewInvite, type ScreeningResult } from "@/lib/mock-api";
+import { addCandidate, type ScreeningResult, type Candidate } from "@/lib/mock-api";
+import { triggerInviteWebhook, triggerRejectWebhook, getInviteWebhookUrl, getRejectWebhookUrl } from "@/lib/webhook-store";
 import { cn } from "@/lib/utils";
 import mammoth from "mammoth";
 import * as pdfjsLib from "pdfjs-dist";
@@ -32,19 +33,27 @@ import * as pdfjsLib from "pdfjs-dist";
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
 export default function Screen() {
+  const navigate = useNavigate();
   const [jobDescription, setJobDescription] = useState("");
   const [resumeText, setResumeText] = useState("");
+  const [candidateName, setCandidateName] = useState("");
+  const [candidateEmail, setCandidateEmail] = useState("");
+  const [roleTitle, setRoleTitle] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<ScreeningResult | null>(null);
-  const [inviteSent, setInviteSent] = useState(false);
+  const [processedStatus, setProcessedStatus] = useState<"invited" | "rejected" | "review" | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isParsingFile, setIsParsingFile] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [addedCandidateId, setAddedCandidateId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const jdValid = jobDescription.length >= 100;
   const resumeValid = resumeText.length >= 50;
+  const nameValid = candidateName.length >= 2;
+  const emailValid = candidateEmail.includes("@");
+  const roleValid = roleTitle.length >= 2;
 
   const extractTextFromPdf = async (file: File): Promise<string> => {
     const arrayBuffer = await file.arrayBuffer();
@@ -87,7 +96,6 @@ export default function Screen() {
       } else if (fileName.endsWith(".docx") || fileName.endsWith(".doc")) {
         extractedText = await extractTextFromDocx(file);
       } else {
-        // Try to read as text for other formats
         extractedText = await file.text();
       }
 
@@ -133,25 +141,35 @@ export default function Screen() {
     
     const file = e.dataTransfer.files?.[0];
     if (file) {
-      // Create a synthetic event to reuse handleFileUpload logic
       const input = fileInputRef.current;
       if (input) {
         const dataTransfer = new DataTransfer();
         dataTransfer.items.add(file);
         input.files = dataTransfer.files;
         
-        // Trigger the change handler manually
         const event = { target: input } as ChangeEvent<HTMLInputElement>;
         await handleFileUpload(event);
       }
     }
   };
 
+  const determineStatus = (score: number): Candidate["status"] => {
+    if (score >= 90) return "Invited";
+    if (score <= 40) return "Rejected";
+    return "Review";
+  };
+
+  const determineFitCategory = (score: number): Candidate["fitCategory"] => {
+    if (score >= 75) return "Strong";
+    if (score >= 50) return "Medium";
+    return "Low";
+  };
+
   const handleAnalyze = async () => {
-    if (!jdValid || !resumeValid) {
+    if (!jdValid || !resumeValid || !nameValid || !emailValid || !roleValid) {
       toast({
         title: "Validation Error",
-        description: "Please ensure both fields meet minimum requirements.",
+        description: "Please fill all required fields correctly.",
         variant: "destructive",
       });
       return;
@@ -159,7 +177,8 @@ export default function Screen() {
   
     setIsAnalyzing(true);
     setResult(null);
-    setInviteSent(false);
+    setProcessedStatus(null);
+    setAddedCandidateId(null);
   
     try {
       const response = await fetch(
@@ -186,7 +205,7 @@ export default function Screen() {
       
       const screeningResult: ScreeningResult = {
         fitScore: Number(raw.fitScore),
-        fitCategory: raw.fitCategory,
+        fitCategory: raw.fitCategory || determineFitCategory(Number(raw.fitScore)),
         screeningSummary: raw.screeningSummary,
         strengths: Array.isArray(raw.strengths) ? raw.strengths : [],
         gaps: Array.isArray(raw.gaps) ? raw.gaps : [],
@@ -194,17 +213,83 @@ export default function Screen() {
       };
       
       setResult(screeningResult);
-        
-      toast({
-        title: "Analysis Complete",
-        description: `Fit score: ${screeningResult.fitScore}%`,
+
+      // Determine status based on score
+      const status = determineStatus(screeningResult.fitScore);
+      const candidateData = {
+        name: candidateName,
+        email: candidateEmail,
+        role: roleTitle,
+        fitScore: screeningResult.fitScore,
+      };
+
+      // Add candidate to the list
+      const newCandidate = addCandidate({
+        name: candidateName,
+        email: candidateEmail,
+        role: roleTitle,
+        fitScore: screeningResult.fitScore,
+        fitCategory: screeningResult.fitCategory,
+        status,
+        screenedAt: new Date(),
+        lastRole: "From Resume",
       });
+
+      setAddedCandidateId(newCandidate.id);
+
+      // Trigger appropriate webhook based on status
+      if (status === "Invited") {
+        setProcessedStatus("invited");
+        const webhookResult = await triggerInviteWebhook(candidateData);
+        if (webhookResult.success) {
+          toast({
+            title: "Auto-Invited (90%+ Score)",
+            description: `${candidateName} has been invited. Webhook triggered successfully.`,
+          });
+        } else if (getInviteWebhookUrl()) {
+          toast({
+            title: "Auto-Invited (90%+ Score)",
+            description: `${candidateName} invited but webhook failed: ${webhookResult.error}`,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Auto-Invited (90%+ Score)",
+            description: `${candidateName} added to candidates. Configure invite webhook in Settings to send emails.`,
+          });
+        }
+      } else if (status === "Rejected") {
+        setProcessedStatus("rejected");
+        const webhookResult = await triggerRejectWebhook(candidateData);
+        if (webhookResult.success) {
+          toast({
+            title: "Auto-Rejected (≤40% Score)",
+            description: `${candidateName} has been rejected. Webhook triggered successfully.`,
+          });
+        } else if (getRejectWebhookUrl()) {
+          toast({
+            title: "Auto-Rejected (≤40% Score)",
+            description: `${candidateName} rejected but webhook failed: ${webhookResult.error}`,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Auto-Rejected (≤40% Score)",
+            description: `${candidateName} added to candidates. Configure reject webhook in Settings to send emails.`,
+          });
+        }
+      } else {
+        setProcessedStatus("review");
+        toast({
+          title: "Review Needed (41-89% Score)",
+          description: `${candidateName} added to Action Items for manual review.`,
+        });
+      }
   
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       console.error("Screening error:", err);
       
-      // Check for CORS or network errors
       if (errorMessage.includes("Failed to fetch") || errorMessage.includes("NetworkError") || errorMessage.includes("CORS")) {
         toast({
           title: "Connection Failed",
@@ -222,15 +307,20 @@ export default function Screen() {
       setIsAnalyzing(false);
     }
   };
-  
 
-  const handleSendInvite = async () => {
-    await sendInterviewInvite("new-candidate");
-    setInviteSent(true);
-    toast({
-      title: "Interview Invite Sent",
-      description: "The candidate has been notified.",
-    });
+  const handleReset = () => {
+    setResult(null);
+    setJobDescription("");
+    setResumeText("");
+    setCandidateName("");
+    setCandidateEmail("");
+    setRoleTitle("");
+    setProcessedStatus(null);
+    setUploadedFile(null);
+    setAddedCandidateId(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const getActionColor = (action: string) => {
@@ -260,6 +350,43 @@ export default function Screen() {
           Paste a job description and resume to get AI-powered screening insights
         </p>
       </div>
+
+      {/* Candidate Info Section */}
+      <Card className="shadow-sm mb-6">
+        <CardHeader>
+          <CardTitle className="text-lg">Candidate Information</CardTitle>
+          <CardDescription>Enter the candidate's details for tracking</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid sm:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Candidate Name *</Label>
+              <Input
+                placeholder="John Doe"
+                value={candidateName}
+                onChange={(e) => setCandidateName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email *</Label>
+              <Input
+                type="email"
+                placeholder="john@example.com"
+                value={candidateEmail}
+                onChange={(e) => setCandidateEmail(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Role Applied For *</Label>
+              <Input
+                placeholder="Senior Engineer"
+                value={roleTitle}
+                onChange={(e) => setRoleTitle(e.target.value)}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid lg:grid-cols-2 gap-6 mb-6">
         {/* Job Description Input */}
@@ -407,7 +534,7 @@ export default function Screen() {
         <Button
           size="lg"
           onClick={handleAnalyze}
-          disabled={isAnalyzing || !jdValid || !resumeValid}
+          disabled={isAnalyzing || !jdValid || !resumeValid || !nameValid || !emailValid || !roleValid}
           className="px-8"
         >
           {isAnalyzing ? (
@@ -428,6 +555,48 @@ export default function Screen() {
       {result && typeof result.fitScore === "number" && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <Separator />
+
+          {/* Status Banner */}
+          {processedStatus && (
+            <Card className={cn(
+              "shadow-md border-l-4",
+              processedStatus === "invited" && "border-l-accent bg-accent/5",
+              processedStatus === "rejected" && "border-l-destructive bg-destructive/5",
+              processedStatus === "review" && "border-l-warning bg-warning/5"
+            )}>
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {processedStatus === "invited" && <CheckCircle className="h-6 w-6 text-accent" />}
+                    {processedStatus === "rejected" && <XCircle className="h-6 w-6 text-destructive" />}
+                    {processedStatus === "review" && <AlertCircle className="h-6 w-6 text-warning" />}
+                    <div>
+                      <p className="font-semibold text-foreground">
+                        {processedStatus === "invited" && "Candidate Auto-Invited (Score ≥ 90%)"}
+                        {processedStatus === "rejected" && "Candidate Auto-Rejected (Score ≤ 40%)"}
+                        {processedStatus === "review" && "Candidate Added for Review (Score 41-89%)"}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {processedStatus === "invited" && "Invite webhook triggered. Candidate added to Candidates list."}
+                        {processedStatus === "rejected" && "Reject webhook triggered. Candidate added to Candidates list."}
+                        {processedStatus === "review" && "Added to Action Items for manual review."}
+                      </p>
+                    </div>
+                  </div>
+                  {processedStatus === "review" && (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => navigate("/action-items")}
+                      className="flex items-center gap-2"
+                    >
+                      <Eye className="h-4 w-4" />
+                      View in Action Items
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
           
           {/* Fit Score Card */}
           <Card className="shadow-md">
@@ -456,13 +625,20 @@ export default function Screen() {
                   </Badge>
                 </div>
 
-                {/* Recommended Action */}
+                {/* Status */}
                 <div className="text-center flex flex-col items-center justify-center">
-                  <Badge className={cn("text-lg px-4 py-1", getActionColor(result.recommendedAction))}>
-                    {result.recommendedAction === "Interview" && <CheckCircle className="h-4 w-4 mr-1" />}
-                    {result.recommendedAction === "Review" && <AlertCircle className="h-4 w-4 mr-1" />}
-                    {result.recommendedAction === "Reject" && <XCircle className="h-4 w-4 mr-1" />}
-                    {result.recommendedAction}
+                  <Badge className={cn(
+                    "text-lg px-4 py-1",
+                    processedStatus === "invited" && "bg-accent text-accent-foreground",
+                    processedStatus === "rejected" && "bg-destructive text-destructive-foreground",
+                    processedStatus === "review" && "bg-warning text-warning-foreground"
+                  )}>
+                    {processedStatus === "invited" && <CheckCircle className="h-4 w-4 mr-1" />}
+                    {processedStatus === "rejected" && <XCircle className="h-4 w-4 mr-1" />}
+                    {processedStatus === "review" && <AlertCircle className="h-4 w-4 mr-1" />}
+                    {processedStatus === "invited" && "Invited"}
+                    {processedStatus === "rejected" && "Rejected"}
+                    {processedStatus === "review" && "Review Needed"}
                   </Badge>
                 </div>
               </div>
@@ -520,37 +696,18 @@ export default function Screen() {
             </Card>
           </div>
 
-          
-
           {/* Action Buttons */}
           <Card className="shadow-sm">
             <CardContent className="pt-6">
               <div className="flex flex-wrap gap-4 justify-center">
-                {result.recommendedAction === "Interview" && !inviteSent && (
-                  <Button onClick={handleSendInvite} size="lg" className="bg-accent hover:bg-accent/90">
-                    <Mail className="h-5 w-5 mr-2" />
-                    Send Interview Invite
-                  </Button>
-                )}
-                {inviteSent && (
-                  <div className="flex items-center gap-2 text-accent font-medium">
-                    <CheckCircle className="h-5 w-5" />
-                    Interview invite sent successfully
-                  </div>
-                )}
+                <Button variant="outline" size="lg" onClick={() => navigate("/candidates")}>
+                  <Eye className="h-5 w-5 mr-2" />
+                  View All Candidates
+                </Button>
                 <Button
                   variant="outline"
                   size="lg"
-                  onClick={() => {
-                    setResult(null);
-                    setJobDescription("");
-                    setResumeText("");
-                    setInviteSent(false);
-                    setUploadedFile(null);
-                    if (fileInputRef.current) {
-                      fileInputRef.current.value = "";
-                    }
-                  }}
+                  onClick={handleReset}
                 >
                   Screen Another Candidate
                 </Button>

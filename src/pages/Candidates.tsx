@@ -1,22 +1,29 @@
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { getCandidates, updateCandidateStatus, sendInterviewInvite, type Candidate } from "@/lib/mock-api";
-import { Search, Users, CheckCircle, XCircle, Clock, Mail, Eye } from "lucide-react";
+import { getCandidates, updateCandidateStatus, getActionItemByCandidateId, type Candidate } from "@/lib/mock-api";
+import { triggerInviteWebhook, triggerRejectWebhook } from "@/lib/webhook-store";
+import { Search, Users, CheckCircle, XCircle, Clock, Mail, Eye, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
 export default function Candidates() {
+  const navigate = useNavigate();
   const [candidates, setCandidates] = useState<Candidate[]>(getCandidates());
   const [search, setSearch] = useState("");
   const [fitFilter, setFitFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const { toast } = useToast();
+
+  const refreshCandidates = () => {
+    setCandidates(getCandidates());
+  };
 
   const filteredCandidates = candidates.filter((c) => {
     const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -33,22 +40,55 @@ export default function Candidates() {
   };
 
   const handleInvite = async (candidate: Candidate) => {
-    await sendInterviewInvite(candidate.id);
-    updateCandidateStatus(candidate.id, "Invited");
-    setCandidates(getCandidates());
-    toast({
-      title: "Interview Invite Sent",
-      description: `${candidate.name} has been invited for an interview.`,
+    const webhookResult = await triggerInviteWebhook({
+      name: candidate.name,
+      email: candidate.email,
+      role: candidate.role,
+      fitScore: candidate.fitScore,
     });
+
+    updateCandidateStatus(candidate.id, "Invited");
+    refreshCandidates();
+    
+    if (webhookResult.success) {
+      toast({
+        title: "Interview Invite Sent",
+        description: `${candidate.name} has been invited. Webhook triggered successfully.`,
+      });
+    } else {
+      toast({
+        title: "Interview Invite Sent",
+        description: `${candidate.name} marked as invited. ${webhookResult.error ? `Webhook: ${webhookResult.error}` : "Configure webhook in Settings."}`,
+      });
+    }
   };
 
-  const handleReject = (candidate: Candidate) => {
-    updateCandidateStatus(candidate.id, "Rejected");
-    setCandidates(getCandidates());
-    toast({
-      title: "Candidate Rejected",
-      description: `${candidate.name} has been marked as rejected.`,
+  const handleReject = async (candidate: Candidate) => {
+    const webhookResult = await triggerRejectWebhook({
+      name: candidate.name,
+      email: candidate.email,
+      role: candidate.role,
+      fitScore: candidate.fitScore,
     });
+
+    updateCandidateStatus(candidate.id, "Rejected");
+    refreshCandidates();
+    
+    if (webhookResult.success) {
+      toast({
+        title: "Candidate Rejected",
+        description: `${candidate.name} has been rejected. Webhook triggered successfully.`,
+      });
+    } else {
+      toast({
+        title: "Candidate Rejected",
+        description: `${candidate.name} marked as rejected. ${webhookResult.error ? `Webhook: ${webhookResult.error}` : "Configure webhook in Settings."}`,
+      });
+    }
+  };
+
+  const handleReviewClick = (candidate: Candidate) => {
+    navigate("/action-items");
   };
 
   const getStatusBadge = (status: Candidate["status"]) => {
@@ -56,7 +96,7 @@ export default function Candidates() {
       Pending: "bg-secondary text-secondary-foreground",
       Invited: "bg-accent text-accent-foreground",
       Rejected: "bg-destructive text-destructive-foreground",
-      Review: "bg-warning text-warning-foreground",
+      Review: "bg-warning text-warning-foreground cursor-pointer hover:bg-warning/80",
     };
     return styles[status];
   };
@@ -212,7 +252,11 @@ export default function Candidates() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge className={getStatusBadge(candidate.status)}>
+                      <Badge 
+                        className={getStatusBadge(candidate.status)}
+                        onClick={candidate.status === "Review" ? () => handleReviewClick(candidate) : undefined}
+                      >
+                        {candidate.status === "Review" && <AlertCircle className="h-3 w-3 mr-1" />}
                         {candidate.status}
                       </Badge>
                     </TableCell>
@@ -221,9 +265,16 @@ export default function Candidates() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        {candidate.status === "Review" && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleReviewClick(candidate)}
+                            title="View in Action Items"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        )}
                         {(candidate.status === "Pending" || candidate.status === "Review") && (
                           <>
                             <Button
@@ -231,6 +282,7 @@ export default function Candidates() {
                               size="sm"
                               className="text-accent hover:text-accent"
                               onClick={() => handleInvite(candidate)}
+                              title="Send Invite"
                             >
                               <Mail className="h-4 w-4" />
                             </Button>
@@ -239,6 +291,7 @@ export default function Candidates() {
                               size="sm"
                               className="text-destructive hover:text-destructive"
                               onClick={() => handleReject(candidate)}
+                              title="Reject"
                             >
                               <XCircle className="h-4 w-4" />
                             </Button>

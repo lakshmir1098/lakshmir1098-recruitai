@@ -28,6 +28,8 @@ export interface ActionItem {
   message: string;
   priority: "high" | "medium" | "low";
   createdAt: Date;
+  fitScore?: number;
+  email?: string;
 }
 
 // Simulated screening AI response
@@ -86,11 +88,6 @@ export async function screenCandidate(
     recommendedAction,
     strengths: matchedSkills.length > 0 ? matchedSkills.slice(0, 4) : ["Communication", "Problem-solving"],
     gaps: missingSkills.length > 0 ? missingSkills.slice(0, 3) : ["No major gaps identified"],
-    candidateSnapshot: {
-      estimatedSeniority: fitScore >= 70 ? "Senior" : fitScore >= 50 ? "Mid-level" : "Junior",
-      yearsOfExperience: Math.floor(fitScore / 15) + 1,
-      lastRole: resumeLower.includes("engineer") ? "Software Engineer" : resumeLower.includes("manager") ? "Engineering Manager" : "Developer",
-    },
   };
 }
 
@@ -143,9 +140,11 @@ let actionItems: ActionItem[] = [
     candidateName: "Jordan Rivera",
     candidateId: "2",
     role: "Full Stack Developer",
-    message: "Medium-fit candidate requires manual review",
+    message: "Medium-fit candidate requires manual review (62% fit)",
     priority: "medium",
     createdAt: new Date(Date.now() - 172800000),
+    fitScore: 62,
+    email: "j.rivera@email.com",
   },
 ];
 
@@ -164,17 +163,20 @@ export function addCandidate(candidate: Omit<Candidate, "id">) {
   };
   candidates = [newCandidate, ...candidates];
   
-  if (candidate.fitCategory === "Medium") {
+  // Add to action items if score is between 41-89 (Review status)
+  if (candidate.status === "Review") {
     actionItems = [
       {
-        id: Date.now().toString(),
+        id: (Date.now() + 1).toString(),
         type: "review",
         candidateName: candidate.name,
         candidateId: newCandidate.id,
         role: candidate.role,
-        message: "Medium-fit candidate requires manual review",
-        priority: "medium",
+        message: `Review needed - candidate scored ${candidate.fitScore}% fit`,
+        priority: candidate.fitScore >= 70 ? "high" : "medium",
         createdAt: new Date(),
+        fitScore: candidate.fitScore,
+        email: candidate.email,
       },
       ...actionItems,
     ];
@@ -188,4 +190,8 @@ export function updateCandidateStatus(id: string, status: Candidate["status"]) {
   if (status === "Invited" || status === "Rejected") {
     actionItems = actionItems.filter((a) => a.candidateId !== id);
   }
+}
+
+export function getActionItemByCandidateId(candidateId: string): ActionItem | undefined {
+  return actionItems.find((a) => a.candidateId === candidateId);
 }
