@@ -17,7 +17,7 @@ export async function triggerInviteWebhook(candidateData: {
           email: candidateData.email,
         },
         jobTitle: candidateData.role,
-        companyName: candidateData.companyName || "Our Company",
+        companyName: candidateData.companyName || "Recruiter AI Inc by LAkshmi Ramachandran",
       },
     });
 
@@ -51,7 +51,7 @@ export async function triggerRejectWebhook(candidateData: {
           email: candidateData.email,
         },
         jobTitle: candidateData.role,
-        companyName: candidateData.companyName || "Our Company",
+        companyName: candidateData.companyName || "Recruiter AI Inc by LAkshmi Ramachandran",
       },
     });
 
