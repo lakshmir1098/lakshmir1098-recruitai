@@ -1,6 +1,4 @@
-// n8n webhook URLs for invite and reject workflows
-const INVITE_WEBHOOK_URL = "https://mancyram.app.n8n.cloud/webhook/api/recruitai/action/invite";
-const REJECT_WEBHOOK_URL = "https://mancyram.app.n8n.cloud/webhook/2cb93916-2c97-44ae-a87c-99fdcb24c1dc";
+import { supabase } from "@/integrations/supabase/client";
 
 export async function triggerInviteWebhook(candidateData: {
   name: string;
@@ -12,22 +10,24 @@ export async function triggerInviteWebhook(candidateData: {
   try {
     console.log("Triggering invite webhook for:", candidateData.name);
     
-    const response = await fetch(INVITE_WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      mode: "no-cors",
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('invite-candidate', {
+      body: {
         candidate: {
           name: candidateData.name,
           email: candidateData.email,
         },
         jobTitle: candidateData.role,
         companyName: candidateData.companyName || "Our Company",
-      }),
+      },
     });
 
-    console.log("Invite webhook triggered successfully");
-    return { success: true };
+    if (error) {
+      console.error("Invite webhook error:", error);
+      return { success: false, error: error.message };
+    }
+
+    console.log("Invite webhook response:", data);
+    return { success: data?.success ?? true };
   } catch (error) {
     console.error("Invite webhook error:", error);
     return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
@@ -44,22 +44,24 @@ export async function triggerRejectWebhook(candidateData: {
   try {
     console.log("Triggering reject webhook for:", candidateData.name);
     
-    const response = await fetch(REJECT_WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      mode: "no-cors",
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('reject-candidate', {
+      body: {
         candidate: {
           name: candidateData.name,
           email: candidateData.email,
         },
         jobTitle: candidateData.role,
         companyName: candidateData.companyName || "Our Company",
-      }),
+      },
     });
 
-    console.log("Reject webhook triggered successfully");
-    return { success: true };
+    if (error) {
+      console.error("Reject webhook error:", error);
+      return { success: false, error: error.message };
+    }
+
+    console.log("Reject webhook response:", data);
+    return { success: data?.success ?? true };
   } catch (error) {
     console.error("Reject webhook error:", error);
     return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
