@@ -254,22 +254,22 @@ export default function Candidates() {
                         {(candidate.status === "Pending" || candidate.status === "Review") && (
                           <>
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
-                              className="text-accent hover:text-accent"
+                              className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                               onClick={() => handleInvite(candidate)}
-                              title="Send Invite"
                             >
-                              <Mail className="h-4 w-4" />
+                              <Mail className="h-4 w-4 mr-1" />
+                              Invite
                             </Button>
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
-                              className="text-destructive hover:text-destructive"
+                              className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
                               onClick={() => handleReject(candidate)}
-                              title="Reject"
                             >
-                              <XCircle className="h-4 w-4" />
+                              <XCircle className="h-4 w-4 mr-1" />
+                              Reject
                             </Button>
                           </>
                         )}

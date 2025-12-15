@@ -60,10 +60,10 @@ export async function screenCandidate(
   let fitCategory: ScreeningResult["fitCategory"];
   let recommendedAction: ScreeningResult["recommendedAction"];
 
-  if (fitScore >= 75) {
+  if (fitScore >= 90) {
     fitCategory = "Strong";
     recommendedAction = "Interview";
-  } else if (fitScore >= 50) {
+  } else if (fitScore > 40) {
     fitCategory = "Medium";
     recommendedAction = "Review";
   } else {
