@@ -232,12 +232,7 @@ export default function Candidates() {
                     </TableCell>
                     <TableCell>{candidate.role}</TableCell>
                     <TableCell className="text-center">
-                      <span className={cn(
-                        "font-semibold",
-                        candidate.fitScore >= 75 && "text-accent",
-                        candidate.fitScore >= 50 && candidate.fitScore < 75 && "text-warning",
-                        candidate.fitScore < 50 && "text-destructive"
-                      )}>
+                      <span className="font-semibold text-foreground">
                         {candidate.fitScore}%
                       </span>
                     </TableCell>
