@@ -495,7 +495,7 @@ export default function Screen() {
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 75) return "text-accent";
+    if (score >= 75) return "text-primary";
     if (score >= 50) return "text-warning";
     return "text-destructive";
   };
