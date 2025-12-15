@@ -33,6 +33,34 @@ import * as pdfjsLib from "pdfjs-dist";
 // Set PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
+// Example Job Description for quick testing
+const EXAMPLE_JD = `## Job Title: Senior Software Engineer
+
+## Location: Bangalore, India (Hybrid)
+
+## About the Role
+We are looking for a Senior Software Engineer with strong experience in full-stack development to join our growing team. You will work on building scalable web applications and collaborate with cross-functional teams.
+
+## Key Responsibilities
+- Design and develop high-quality, scalable software solutions
+- Write clean, maintainable code following best practices
+- Collaborate with product managers and designers
+- Mentor junior developers and conduct code reviews
+- Participate in agile ceremonies and contribute to technical decisions
+
+## Required Qualifications
+- 4+ years of experience in software development
+- Strong proficiency in JavaScript/TypeScript, React, and Node.js
+- Experience with databases (SQL and NoSQL)
+- Familiarity with cloud services (AWS/GCP/Azure)
+- Excellent problem-solving and communication skills
+
+## Preferred Qualifications
+- Experience with microservices architecture
+- Knowledge of CI/CD pipelines and DevOps practices
+- Contributions to open-source projects
+`;
+
 export default function Screen() {
   const navigate = useNavigate();
   const [jobDescription, setJobDescription] = useState("");
@@ -383,10 +411,21 @@ export default function Screen() {
         {/* Job Description Input */}
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <FileSearch className="h-5 w-5 text-primary" />
-              Job Description
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <FileSearch className="h-5 w-5 text-primary" />
+                Job Description
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setJobDescription(EXAMPLE_JD)}
+                className="text-primary border-primary hover:bg-primary hover:text-primary-foreground"
+              >
+                <Sparkles className="h-4 w-4 mr-1" />
+                Use Example
+              </Button>
+            </div>
             <CardDescription>Paste the full job description here</CardDescription>
           </CardHeader>
           <CardContent>
@@ -577,20 +616,20 @@ export default function Screen() {
                         {processedStatus === "review" && "Candidate Added for Review (Score 41-89%)"}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {processedStatus === "invited" && "Invite webhook triggered. Candidate added to Candidates list."}
-                        {processedStatus === "rejected" && "Reject webhook triggered. Candidate added to Candidates list."}
-                        {processedStatus === "review" && "Added to Action Items for manual review."}
+                        {processedStatus === "invited" && "Invite email workflow triggered. Candidate added to Candidates list."}
+                        {processedStatus === "rejected" && "Reject email workflow triggered. Candidate added to Candidates list."}
+                        {processedStatus === "review" && "Added to Candidates for manual review."}
                       </p>
                     </div>
                   </div>
                   {processedStatus === "review" && (
                     <Button 
                       variant="outline" 
-                      onClick={() => navigate("/action-items")}
+                      onClick={() => navigate("/candidates")}
                       className="flex items-center gap-2"
                     >
                       <Eye className="h-4 w-4" />
-                      View in Action Items
+                      View in Candidates
                     </Button>
                   )}
                 </div>
