@@ -88,19 +88,19 @@ export default function Candidates() {
 
   const getStatusBadge = (status: Candidate["status"]) => {
     const styles = {
-      Pending: "bg-secondary text-secondary-foreground",
-      Invited: "bg-accent text-accent-foreground",
-      Rejected: "bg-destructive text-destructive-foreground",
-      Review: "bg-warning text-warning-foreground",
+      Pending: "bg-slate-100 text-slate-700",
+      Invited: "bg-green-500 text-white",
+      Rejected: "bg-red-500 text-white",
+      Review: "bg-amber-500 text-white",
     };
     return styles[status];
   };
 
   const getFitBadge = (category: Candidate["fitCategory"]) => {
     const styles = {
-      Strong: "bg-accent/10 text-accent border-accent",
-      Medium: "bg-warning/10 text-warning border-warning",
-      Low: "bg-destructive/10 text-destructive border-destructive",
+      Strong: "bg-green-100 text-green-800 border-green-300",
+      Medium: "bg-amber-100 text-amber-800 border-amber-300",
+      Low: "bg-red-100 text-red-800 border-red-300",
     };
     return styles[category];
   };
@@ -232,7 +232,12 @@ export default function Candidates() {
                     </TableCell>
                     <TableCell>{candidate.role}</TableCell>
                     <TableCell className="text-center">
-                      <span className="font-semibold text-foreground">
+                      <span className={cn(
+                        "font-semibold",
+                        candidate.fitScore >= 90 && "text-green-600",
+                        candidate.fitScore >= 41 && candidate.fitScore < 90 && "text-amber-600",
+                        candidate.fitScore <= 40 && "text-red-600"
+                      )}>
                         {candidate.fitScore}%
                       </span>
                     </TableCell>
