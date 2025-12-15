@@ -7,6 +7,7 @@ export async function triggerInviteWebhook(candidateData: {
   email: string;
   role: string;
   fitScore: number;
+  companyName?: string;
 }): Promise<{ success: boolean; error?: string }> {
   try {
     console.log("Triggering invite webhook for:", candidateData.name);
@@ -16,9 +17,12 @@ export async function triggerInviteWebhook(candidateData: {
       headers: { "Content-Type": "application/json" },
       mode: "no-cors",
       body: JSON.stringify({
-        action: "invite",
-        timestamp: new Date().toISOString(),
-        candidate: candidateData,
+        candidate: {
+          name: candidateData.name,
+          email: candidateData.email,
+        },
+        jobTitle: candidateData.role,
+        companyName: candidateData.companyName || "Our Company",
       }),
     });
 
@@ -35,6 +39,7 @@ export async function triggerRejectWebhook(candidateData: {
   email: string;
   role: string;
   fitScore: number;
+  companyName?: string;
 }): Promise<{ success: boolean; error?: string }> {
   try {
     console.log("Triggering reject webhook for:", candidateData.name);
@@ -44,9 +49,12 @@ export async function triggerRejectWebhook(candidateData: {
       headers: { "Content-Type": "application/json" },
       mode: "no-cors",
       body: JSON.stringify({
-        action: "reject",
-        timestamp: new Date().toISOString(),
-        candidate: candidateData,
+        candidate: {
+          name: candidateData.name,
+          email: candidateData.email,
+        },
+        jobTitle: candidateData.role,
+        companyName: candidateData.companyName || "Our Company",
       }),
     });
 
