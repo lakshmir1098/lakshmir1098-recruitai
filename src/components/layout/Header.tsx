@@ -1,7 +1,8 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { FileSearch, Users, Settings, LogOut } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 import logo from "@/assets/logo.png";
 
 const navItems = [
@@ -12,11 +13,10 @@ const navItems = [
 
 export function Header() {
   const location = useLocation();
-  const navigate = useNavigate();
+  const { signOut } = useAuth();
 
-  const handleLogout = () => {
-    localStorage.removeItem("isAuthenticated");
-    navigate("/login");
+  const handleLogout = async () => {
+    await signOut();
   };
 
   return (

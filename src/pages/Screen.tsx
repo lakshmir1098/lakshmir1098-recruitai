@@ -30,6 +30,7 @@ import { triggerInviteWebhook, triggerRejectWebhook } from "@/lib/webhook-store"
 import { isAutoInviteEnabled, isAutoRejectEnabled } from "@/lib/settings-store";
 import { cn } from "@/lib/utils";
 import { AnalysisProgress } from "@/components/AnalysisProgress";
+import { supabase } from "@/integrations/supabase/client";
 import mammoth from "mammoth";
 import * as pdfjsLib from "pdfjs-dist";
 
@@ -268,27 +269,22 @@ export default function Screen() {
     setAddedCandidateId(null);
   
     try {
-      const response = await fetch(
-        "https://mancyram.app.n8n.cloud/webhook/b41ad258-86d3-42e3-9319-88271b95e5ab",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            jd: jobDescription,
-            resume: resumeText,
-          }),
-        }
-      );
-  
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => "Unknown error");
-        console.error("n8n webhook error:", response.status, response.statusText, errorText);
-        throw new Error(`n8n webhook returned ${response.status}: ${response.statusText}`);
+      // Call screening through authenticated edge function
+      const { data: raw, error: funcError } = await supabase.functions.invoke('screen-candidate', {
+        body: {
+          jobDescription,
+          resumeText,
+        },
+      });
+
+      if (funcError) {
+        console.error("Screening function error:", funcError);
+        throw new Error(funcError.message || "Screening service unavailable");
       }
-  
-      const raw = await response.json();
+
+      if (raw?.error) {
+        throw new Error(raw.error);
+      }
       
       const screeningResult: ScreeningResult = {
         fitScore: Number(raw.fitScore),
@@ -381,10 +377,10 @@ export default function Screen() {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       console.error("Screening error:", err);
       
-      if (errorMessage.includes("Failed to fetch") || errorMessage.includes("NetworkError") || errorMessage.includes("CORS")) {
+      if (errorMessage.includes("Unauthorized")) {
         toast({
-          title: "Connection Failed",
-          description: "Cannot connect to n8n. This may be a CORS issue. Check browser console for details.",
+          title: "Authentication Required",
+          description: "Please sign in again to continue.",
           variant: "destructive",
         });
       } else {
