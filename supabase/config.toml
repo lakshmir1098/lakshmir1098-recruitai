@@ -1,1 +1,10 @@
 project_id = "zjiftiwwtmbyhqvblcib"
+
+[functions.screen-candidate]
+verify_jwt = false
+
+[functions.invite-candidate]
+verify_jwt = false
+
+[functions.reject-candidate]
+verify_jwt = false
