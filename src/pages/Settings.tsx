@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -7,13 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Settings as SettingsIcon, Bell, Database, Webhook, Mail, XCircle } from "lucide-react";
-import { 
-  getInviteWebhookUrl, 
-  setInviteWebhookUrl, 
-  getRejectWebhookUrl, 
-  setRejectWebhookUrl 
-} from "@/lib/webhook-store";
+import { Settings as SettingsIcon, Bell, Database } from "lucide-react";
 
 export default function Settings() {
   const [autoInviteStrong, setAutoInviteStrong] = useState(true);
@@ -22,17 +16,12 @@ export default function Settings() {
   const [timezone, setTimezone] = useState("America/New_York");
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [dataRetention, setDataRetention] = useState("90");
-  const [inviteWebhook, setInviteWebhook] = useState(getInviteWebhookUrl());
-  const [rejectWebhook, setRejectWebhook] = useState(getRejectWebhookUrl());
   const { toast } = useToast();
 
   const handleSave = () => {
-    setInviteWebhookUrl(inviteWebhook);
-    setRejectWebhookUrl(rejectWebhook);
-    
     toast({
       title: "Settings Saved",
-      description: "Your preferences and webhook URLs have been updated.",
+      description: "Your preferences have been updated.",
     });
   };
 
@@ -41,55 +30,11 @@ export default function Settings() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground">Settings</h1>
         <p className="text-muted-foreground mt-1">
-          Configure your screening preferences and webhook integrations
+          Configure your screening preferences
         </p>
       </div>
 
       <div className="space-y-6">
-        {/* Webhook Configuration */}
-        <Card className="shadow-sm border-l-4 border-l-primary">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Webhook className="h-5 w-5 text-primary" />
-              Webhook Configuration
-            </CardTitle>
-            <CardDescription>
-              Configure webhook URLs for automated invite and rejection emails
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-accent" />
-                Invite Webhook URL
-              </Label>
-              <Input
-                placeholder="https://your-webhook-url.com/invite"
-                value={inviteWebhook}
-                onChange={(e) => setInviteWebhook(e.target.value)}
-              />
-              <p className="text-sm text-muted-foreground">
-                This webhook is triggered when a candidate is invited (score ≥ 90% auto-invite, or manual invite)
-              </p>
-            </div>
-            <Separator />
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <XCircle className="h-4 w-4 text-destructive" />
-                Reject Webhook URL
-              </Label>
-              <Input
-                placeholder="https://your-webhook-url.com/reject"
-                value={rejectWebhook}
-                onChange={(e) => setRejectWebhook(e.target.value)}
-              />
-              <p className="text-sm text-muted-foreground">
-                This webhook is triggered when a candidate is rejected (score ≤ 40% auto-reject, or manual reject)
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Screening Automation */}
         <Card className="shadow-sm">
           <CardHeader>

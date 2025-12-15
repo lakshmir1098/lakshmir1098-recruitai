@@ -24,7 +24,7 @@ import {
   Eye
 } from "lucide-react";
 import { addCandidate, type ScreeningResult, type Candidate } from "@/lib/mock-api";
-import { triggerInviteWebhook, triggerRejectWebhook, getInviteWebhookUrl, getRejectWebhookUrl } from "@/lib/webhook-store";
+import { triggerInviteWebhook, triggerRejectWebhook } from "@/lib/webhook-store";
 import { cn } from "@/lib/utils";
 import { AnalysisProgress } from "@/components/AnalysisProgress";
 import mammoth from "mammoth";
@@ -245,18 +245,13 @@ export default function Screen() {
         if (webhookResult.success) {
           toast({
             title: "Auto-Invited (90%+ Score)",
-            description: `${candidateName} has been invited. Webhook triggered successfully.`,
-          });
-        } else if (getInviteWebhookUrl()) {
-          toast({
-            title: "Auto-Invited (90%+ Score)",
-            description: `${candidateName} invited but webhook failed: ${webhookResult.error}`,
-            variant: "destructive",
+            description: `${candidateName} has been invited. Email workflow triggered.`,
           });
         } else {
           toast({
             title: "Auto-Invited (90%+ Score)",
-            description: `${candidateName} added to candidates. Configure invite webhook in Settings to send emails.`,
+            description: `${candidateName} invited but email workflow failed: ${webhookResult.error}`,
+            variant: "destructive",
           });
         }
       } else if (status === "Rejected") {
@@ -265,25 +260,20 @@ export default function Screen() {
         if (webhookResult.success) {
           toast({
             title: "Auto-Rejected (≤40% Score)",
-            description: `${candidateName} has been rejected. Webhook triggered successfully.`,
-          });
-        } else if (getRejectWebhookUrl()) {
-          toast({
-            title: "Auto-Rejected (≤40% Score)",
-            description: `${candidateName} rejected but webhook failed: ${webhookResult.error}`,
-            variant: "destructive",
+            description: `${candidateName} has been rejected. Email workflow triggered.`,
           });
         } else {
           toast({
             title: "Auto-Rejected (≤40% Score)",
-            description: `${candidateName} added to candidates. Configure reject webhook in Settings to send emails.`,
+            description: `${candidateName} rejected but email workflow failed: ${webhookResult.error}`,
+            variant: "destructive",
           });
         }
       } else {
         setProcessedStatus("review");
         toast({
           title: "Review Needed (41-89% Score)",
-          description: `${candidateName} added to Action Items for manual review.`,
+          description: `${candidateName} added to Candidates for manual review.`,
         });
       }
   
