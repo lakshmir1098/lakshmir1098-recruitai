@@ -23,7 +23,8 @@ import {
   X,
   Eye
 } from "lucide-react";
-import { addCandidate, type ScreeningResult, type Candidate } from "@/lib/mock-api";
+import { addCandidate, type Candidate, type FitCategory, type CandidateStatus } from "@/lib/candidates-db";
+import { type ScreeningResult } from "@/lib/mock-api";
 import { triggerInviteWebhook, triggerRejectWebhook } from "@/lib/webhook-store";
 import { isAutoInviteEnabled, isAutoRejectEnabled } from "@/lib/settings-store";
 import { cn } from "@/lib/utils";
@@ -183,7 +184,7 @@ export default function Screen() {
     }
   };
 
-  const determineStatus = (score: number): Candidate["status"] => {
+  const determineStatus = (score: number): CandidateStatus => {
     // Check settings to determine if auto-invite/auto-reject is enabled
     const autoInvite = isAutoInviteEnabled();
     const autoReject = isAutoRejectEnabled();
@@ -193,7 +194,7 @@ export default function Screen() {
     return "Review";
   };
 
-  const determineFitCategory = (score: number): Candidate["fitCategory"] => {
+  const determineFitCategory = (score: number): FitCategory => {
     if (score >= 75) return "Strong";
     if (score >= 50) return "Medium";
     return "Low";
@@ -257,16 +258,20 @@ export default function Screen() {
         fitScore: screeningResult.fitScore,
       };
 
-      // Add candidate to the list
-      const newCandidate = addCandidate({
+      // Add candidate to the database with resume and job description
+      const newCandidate = await addCandidate({
         name: candidateName,
         email: candidateEmail,
         role: roleTitle,
         fitScore: screeningResult.fitScore,
         fitCategory: screeningResult.fitCategory,
         status,
-        screenedAt: new Date(),
-        lastRole: "From Resume",
+        resumeText: resumeText,
+        jobDescription: jobDescription,
+        screeningSummary: screeningResult.screeningSummary,
+        strengths: screeningResult.strengths,
+        gaps: screeningResult.gaps,
+        recommendedAction: screeningResult.recommendedAction,
       });
 
       setAddedCandidateId(newCandidate.id);

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,14 +16,16 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { getCandidates, updateCandidateStatus, type Candidate } from "@/lib/mock-api";
+import { fetchCandidates, updateCandidateStatus, type Candidate } from "@/lib/candidates-db";
 import { triggerInviteWebhook, triggerRejectWebhook } from "@/lib/webhook-store";
-import { Search, Users, CheckCircle, XCircle, Clock, Mail, AlertTriangle, MessageSquare, TrendingUp } from "lucide-react";
+import { Search, Users, CheckCircle, XCircle, Clock, Mail, AlertTriangle, MessageSquare, TrendingUp, FileText, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { ResumePreviewDialog } from "@/components/ResumePreviewDialog";
 
 export default function Candidates() {
-  const [candidates, setCandidates] = useState<Candidate[]>(getCandidates());
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [fitFilter, setFitFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -32,11 +34,30 @@ export default function Candidates() {
   const [actionType, setActionType] = useState<"invite" | "reject" | null>(null);
   const [comment, setComment] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [previewCandidate, setPreviewCandidate] = useState<Candidate | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const { toast } = useToast();
 
-  const refreshCandidates = () => {
-    setCandidates(getCandidates());
+  const loadCandidates = async () => {
+    try {
+      setIsLoading(true);
+      const data = await fetchCandidates();
+      setCandidates(data);
+    } catch (error) {
+      console.error("Error loading candidates:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load candidates. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  useEffect(() => {
+    loadCandidates();
+  }, []);
 
   const filteredCandidates = candidates.filter((c) => {
     const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -65,6 +86,11 @@ export default function Candidates() {
     setCommentDialogOpen(true);
   };
 
+  const openResumePreview = (candidate: Candidate) => {
+    setPreviewCandidate(candidate);
+    setPreviewOpen(true);
+  };
+
   const handleConfirmAction = async () => {
     if (!selectedCandidate || !actionType) return;
     
@@ -80,7 +106,7 @@ export default function Candidates() {
 
       if (actionType === "invite") {
         const webhookResult = await triggerInviteWebhook(webhookData);
-        updateCandidateStatus(selectedCandidate.id, "Invited", comment);
+        await updateCandidateStatus(selectedCandidate.id, "Invited", comment);
         
         toast({
           title: "Interview Invite Sent",
@@ -90,7 +116,7 @@ export default function Candidates() {
         });
       } else {
         const webhookResult = await triggerRejectWebhook(webhookData);
-        updateCandidateStatus(selectedCandidate.id, "Rejected", comment);
+        await updateCandidateStatus(selectedCandidate.id, "Rejected", comment);
         
         toast({
           title: "Candidate Rejected",
@@ -100,8 +126,15 @@ export default function Candidates() {
         });
       }
       
-      refreshCandidates();
+      await loadCandidates();
       setCommentDialogOpen(false);
+    } catch (error) {
+      console.error("Error processing action:", error);
+      toast({
+        title: "Error",
+        description: "Failed to process action. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -125,6 +158,17 @@ export default function Candidates() {
     };
     return styles[category];
   };
+
+  if (isLoading) {
+    return (
+      <div className="container py-8 flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading candidates...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container py-8">
@@ -259,13 +303,14 @@ export default function Candidates() {
                 <TableHead className="text-center">Category</TableHead>
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead>Screened</TableHead>
+                <TableHead className="text-center">Resume</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredCandidates.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No candidates found
                   </TableCell>
                 </TableRow>
@@ -315,6 +360,17 @@ export default function Candidates() {
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {format(candidate.screenedAt, "MMM d, yyyy")}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openResumePreview(candidate)}
+                        className="text-muted-foreground hover:text-foreground"
+                        title="Preview Resume"
+                      >
+                        <FileText className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -395,6 +451,13 @@ export default function Candidates() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Resume Preview Dialog */}
+      <ResumePreviewDialog
+        candidate={previewCandidate}
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+      />
     </div>
   );
 }
