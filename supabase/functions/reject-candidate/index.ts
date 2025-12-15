@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,21 +15,60 @@ serve(async (req) => {
   }
 
   try {
-    const { candidate, jobTitle, companyName } = await req.json();
+    // Verify JWT authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - No authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    console.log("Received reject request:", { 
-      candidateName: candidate?.name,
-      candidateEmail: candidate?.email,
-      jobTitle,
-      companyName
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || !user) {
+      console.error("Auth error:", authError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const body = await req.json();
+    const { candidate, jobTitle, companyName } = body;
+
+    // Server-side validation
+    if (!candidate || !candidate.name || !candidate.email) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid candidate data. Name and email are required.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(candidate.email)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid email format.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log("Authenticated reject request from user:", user.id, {
+      candidateName: candidate.name,
+      candidateEmail: candidate.email,
+      jobTitle
     });
 
-    // Forward request to n8n webhook 
+    // Forward request to n8n webhook
     const response = await fetch(REJECT_WEBHOOK_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ candidate, jobTitle, companyName }),
     });
 
@@ -43,8 +83,8 @@ serve(async (req) => {
     } catch {
       data = { success: true };
     }
-    
-    console.log("n8n reject response received:", data);
+
+    console.log("n8n reject response received for user:", user.id);
 
     return new Response(JSON.stringify({ success: true, data }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
