@@ -1,3 +1,5 @@
+import { format } from "date-fns";
+
 export type ScreeningResult = {
   fitScore: number;
   fitCategory: "Strong" | "Medium" | "Low";
@@ -17,6 +19,9 @@ export interface Candidate {
   status: "Pending" | "Invited" | "Rejected" | "Review";
   screenedAt: Date;
   lastRole: string;
+  actionComment?: string;
+  isDuplicate?: boolean;
+  duplicateInfo?: string;
 }
 
 export interface ActionItem {
@@ -156,10 +161,37 @@ export function getActionItems(): ActionItem[] {
   return actionItems;
 }
 
+export function checkDuplicate(email: string, role: string): { isDuplicate: boolean; duplicateInfo?: string } {
+  const existingByEmail = candidates.filter(c => c.email.toLowerCase() === email.toLowerCase());
+  
+  if (existingByEmail.length === 0) {
+    return { isDuplicate: false };
+  }
+  
+  const sameRole = existingByEmail.find(c => c.role.toLowerCase() === role.toLowerCase());
+  if (sameRole) {
+    return { 
+      isDuplicate: true, 
+      duplicateInfo: `Already screened for "${sameRole.role}" on ${format(sameRole.screenedAt, "MMM d, yyyy")} (Score: ${sameRole.fitScore}%)`
+    };
+  }
+  
+  const otherRoles = existingByEmail.map(c => c.role).join(", ");
+  return { 
+    isDuplicate: true, 
+    duplicateInfo: `Previously screened for: ${otherRoles}`
+  };
+}
+
 export function addCandidate(candidate: Omit<Candidate, "id">) {
+  // Check for duplicates
+  const duplicateCheck = checkDuplicate(candidate.email, candidate.role);
+  
   const newCandidate: Candidate = {
     ...candidate,
     id: Date.now().toString(),
+    isDuplicate: duplicateCheck.isDuplicate,
+    duplicateInfo: duplicateCheck.duplicateInfo,
   };
   candidates = [newCandidate, ...candidates];
   
@@ -168,12 +200,14 @@ export function addCandidate(candidate: Omit<Candidate, "id">) {
     actionItems = [
       {
         id: (Date.now() + 1).toString(),
-        type: "review",
+        type: duplicateCheck.isDuplicate ? "duplicate" : "review",
         candidateName: candidate.name,
         candidateId: newCandidate.id,
         role: candidate.role,
-        message: `Review needed - candidate scored ${candidate.fitScore}% fit`,
-        priority: candidate.fitScore >= 70 ? "high" : "medium",
+        message: duplicateCheck.isDuplicate 
+          ? `Duplicate candidate - ${duplicateCheck.duplicateInfo}`
+          : `Review needed - candidate scored ${candidate.fitScore}% fit`,
+        priority: duplicateCheck.isDuplicate ? "high" : (candidate.fitScore >= 70 ? "high" : "medium"),
         createdAt: new Date(),
         fitScore: candidate.fitScore,
         email: candidate.email,
@@ -185,8 +219,8 @@ export function addCandidate(candidate: Omit<Candidate, "id">) {
   return newCandidate;
 }
 
-export function updateCandidateStatus(id: string, status: Candidate["status"]) {
-  candidates = candidates.map((c) => (c.id === id ? { ...c, status } : c));
+export function updateCandidateStatus(id: string, status: Candidate["status"], comment?: string) {
+  candidates = candidates.map((c) => (c.id === id ? { ...c, status, actionComment: comment || c.actionComment } : c));
   if (status === "Invited" || status === "Rejected") {
     actionItems = actionItems.filter((a) => a.candidateId !== id);
   }

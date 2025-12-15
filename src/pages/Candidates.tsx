@@ -3,12 +3,22 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { getCandidates, updateCandidateStatus, type Candidate } from "@/lib/mock-api";
 import { triggerInviteWebhook, triggerRejectWebhook } from "@/lib/webhook-store";
-import { Search, Users, CheckCircle, XCircle, Clock, Mail } from "lucide-react";
+import { Search, Users, CheckCircle, XCircle, Clock, Mail, AlertTriangle, MessageSquare, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -17,6 +27,11 @@ export default function Candidates() {
   const [search, setSearch] = useState("");
   const [fitFilter, setFitFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [commentDialogOpen, setCommentDialogOpen] = useState(false);
+  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
+  const [actionType, setActionType] = useState<"invite" | "reject" | null>(null);
+  const [comment, setComment] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
   const refreshCandidates = () => {
@@ -31,60 +46,66 @@ export default function Candidates() {
     return matchesSearch && matchesFit && matchesStatus;
   });
 
+  // Auto-calculated stats from actual candidate data
   const stats = {
+    total: candidates.length,
     strong: candidates.filter((c) => c.fitCategory === "Strong").length,
     medium: candidates.filter((c) => c.fitCategory === "Medium").length,
+    low: candidates.filter((c) => c.fitCategory === "Low").length,
     pending: candidates.filter((c) => c.status === "Pending" || c.status === "Review").length,
+    invited: candidates.filter((c) => c.status === "Invited").length,
+    rejected: candidates.filter((c) => c.status === "Rejected").length,
+    duplicates: candidates.filter((c) => c.isDuplicate).length,
   };
 
-  const handleInvite = async (candidate: Candidate) => {
-    const webhookResult = await triggerInviteWebhook({
-      name: candidate.name,
-      email: candidate.email,
-      role: candidate.role,
-      fitScore: candidate.fitScore,
-    });
+  const openCommentDialog = (candidate: Candidate, type: "invite" | "reject") => {
+    setSelectedCandidate(candidate);
+    setActionType(type);
+    setComment("");
+    setCommentDialogOpen(true);
+  };
 
-    updateCandidateStatus(candidate.id, "Invited");
-    refreshCandidates();
+  const handleConfirmAction = async () => {
+    if (!selectedCandidate || !actionType) return;
     
-    if (webhookResult.success) {
-      toast({
-        title: "Interview Invite Sent",
-        description: `${candidate.name} has been invited. Webhook triggered successfully.`,
-      });
-    } else {
-      toast({
-        title: "Interview Invite Sent",
-        description: `${candidate.name} marked as invited. ${webhookResult.error ? `Webhook: ${webhookResult.error}` : "Configure webhook in Settings."}`,
-      });
+    setIsProcessing(true);
+    
+    try {
+      const webhookData = {
+        name: selectedCandidate.name,
+        email: selectedCandidate.email,
+        role: selectedCandidate.role,
+        fitScore: selectedCandidate.fitScore,
+      };
+
+      if (actionType === "invite") {
+        const webhookResult = await triggerInviteWebhook(webhookData);
+        updateCandidateStatus(selectedCandidate.id, "Invited", comment);
+        
+        toast({
+          title: "Interview Invite Sent",
+          description: webhookResult.success 
+            ? `${selectedCandidate.name} has been invited. Email workflow triggered.`
+            : `${selectedCandidate.name} marked as invited.`,
+        });
+      } else {
+        const webhookResult = await triggerRejectWebhook(webhookData);
+        updateCandidateStatus(selectedCandidate.id, "Rejected", comment);
+        
+        toast({
+          title: "Candidate Rejected",
+          description: webhookResult.success 
+            ? `${selectedCandidate.name} has been rejected. Email workflow triggered.`
+            : `${selectedCandidate.name} marked as rejected.`,
+        });
+      }
+      
+      refreshCandidates();
+      setCommentDialogOpen(false);
+    } finally {
+      setIsProcessing(false);
     }
   };
-
-  const handleReject = async (candidate: Candidate) => {
-    const webhookResult = await triggerRejectWebhook({
-      name: candidate.name,
-      email: candidate.email,
-      role: candidate.role,
-      fitScore: candidate.fitScore,
-    });
-
-    updateCandidateStatus(candidate.id, "Rejected");
-    refreshCandidates();
-    
-    if (webhookResult.success) {
-      toast({
-        title: "Candidate Rejected",
-        description: `${candidate.name} has been rejected. Webhook triggered successfully.`,
-      });
-    } else {
-      toast({
-        title: "Candidate Rejected",
-        description: `${candidate.name} marked as rejected. ${webhookResult.error ? `Webhook: ${webhookResult.error}` : "Configure webhook in Settings."}`,
-      });
-    }
-  };
-
 
   const getStatusBadge = (status: Candidate["status"]) => {
     const styles = {
@@ -110,20 +131,20 @@ export default function Candidates() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground">Candidates</h1>
         <p className="text-muted-foreground mt-1">
-          View and manage all screened candidates
+          View and manage all screened candidates ({stats.total} total)
         </p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid sm:grid-cols-4 gap-4 mb-6">
         <Card className="shadow-sm">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-accent/10 rounded-lg">
-                <CheckCircle className="h-5 w-5 text-accent" />
+              <div className="p-2 bg-green-100 rounded-lg">
+                <CheckCircle className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <div className="text-2xl font-bold">{stats.strong}</div>
+                <div className="text-2xl font-bold text-foreground">{stats.strong}</div>
                 <div className="text-sm text-muted-foreground">Strong Fits</div>
               </div>
             </div>
@@ -132,11 +153,11 @@ export default function Candidates() {
         <Card className="shadow-sm">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-warning/10 rounded-lg">
-                <Clock className="h-5 w-5 text-warning" />
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <Clock className="h-5 w-5 text-amber-600" />
               </div>
               <div>
-                <div className="text-2xl font-bold">{stats.medium}</div>
+                <div className="text-2xl font-bold text-foreground">{stats.medium}</div>
                 <div className="text-sm text-muted-foreground">Medium Fits</div>
               </div>
             </div>
@@ -145,17 +166,44 @@ export default function Candidates() {
         <Card className="shadow-sm">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-secondary rounded-lg">
-                <Users className="h-5 w-5 text-muted-foreground" />
+              <div className="p-2 bg-slate-100 rounded-lg">
+                <Users className="h-5 w-5 text-slate-600" />
               </div>
               <div>
-                <div className="text-2xl font-bold">{stats.pending}</div>
+                <div className="text-2xl font-bold text-foreground">{stats.pending}</div>
                 <div className="text-sm text-muted-foreground">Awaiting Action</div>
               </div>
             </div>
           </CardContent>
         </Card>
+        <Card className="shadow-sm">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <TrendingUp className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-foreground">{stats.invited}</div>
+                <div className="text-sm text-muted-foreground">Invited</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Duplicate Warning */}
+      {stats.duplicates > 0 && (
+        <Card className="shadow-sm mb-6 border-l-4 border-l-amber-500 bg-amber-50">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <p className="text-sm text-amber-800">
+                <strong>{stats.duplicates} duplicate candidate(s)</strong> detected. These are marked with a warning icon.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card className="shadow-sm mb-6">
@@ -223,14 +271,28 @@ export default function Candidates() {
                 </TableRow>
               ) : (
                 filteredCandidates.map((candidate) => (
-                  <TableRow key={candidate.id}>
+                  <TableRow key={candidate.id} className={cn(candidate.isDuplicate && "bg-amber-50/50")}>
                     <TableCell>
-                      <div>
-                        <div className="font-medium">{candidate.name}</div>
-                        <div className="text-sm text-muted-foreground">{candidate.email}</div>
+                      <div className="flex items-start gap-2">
+                        {candidate.isDuplicate && (
+                          <AlertTriangle className="h-4 w-4 text-amber-500 mt-1 flex-shrink-0" />
+                        )}
+                        <div>
+                          <div className="font-medium text-foreground">{candidate.name}</div>
+                          <div className="text-sm text-muted-foreground">{candidate.email}</div>
+                          {candidate.isDuplicate && (
+                            <div className="text-xs text-amber-600 mt-1">{candidate.duplicateInfo}</div>
+                          )}
+                          {candidate.actionComment && (
+                            <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                              <MessageSquare className="h-3 w-3" />
+                              {candidate.actionComment}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
-                    <TableCell>{candidate.role}</TableCell>
+                    <TableCell className="text-foreground">{candidate.role}</TableCell>
                     <TableCell className="text-center">
                       <span className={cn(
                         "font-semibold",
@@ -262,7 +324,7 @@ export default function Candidates() {
                               variant="outline"
                               size="sm"
                               className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                              onClick={() => handleInvite(candidate)}
+                              onClick={() => openCommentDialog(candidate, "invite")}
                             >
                               <Mail className="h-4 w-4 mr-1" />
                               Invite
@@ -271,7 +333,7 @@ export default function Candidates() {
                               variant="outline"
                               size="sm"
                               className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                              onClick={() => handleReject(candidate)}
+                              onClick={() => openCommentDialog(candidate, "reject")}
                             >
                               <XCircle className="h-4 w-4 mr-1" />
                               Reject
@@ -287,6 +349,52 @@ export default function Candidates() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Comment Dialog */}
+      <Dialog open={commentDialogOpen} onOpenChange={setCommentDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              {actionType === "invite" ? "Invite Candidate" : "Reject Candidate"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedCandidate && (
+                <>
+                  You are about to {actionType === "invite" ? "invite" : "reject"}{" "}
+                  <strong>{selectedCandidate.name}</strong> for{" "}
+                  <strong>{selectedCandidate.role}</strong>.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="comment">Add a comment (optional)</Label>
+            <Textarea
+              id="comment"
+              placeholder="Why are you taking this action? This helps track decisions..."
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              className="mt-2"
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCommentDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmAction}
+              disabled={isProcessing}
+              className={cn(
+                actionType === "invite" && "bg-primary hover:bg-primary/90",
+                actionType === "reject" && "bg-destructive hover:bg-destructive/90"
+              )}
+            >
+              {isProcessing ? "Processing..." : actionType === "invite" ? "Send Invite" : "Confirm Reject"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
