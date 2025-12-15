@@ -26,6 +26,7 @@ import {
 import { addCandidate, type ScreeningResult, type Candidate } from "@/lib/mock-api";
 import { triggerInviteWebhook, triggerRejectWebhook, getInviteWebhookUrl, getRejectWebhookUrl } from "@/lib/webhook-store";
 import { cn } from "@/lib/utils";
+import { AnalysisProgress } from "@/components/AnalysisProgress";
 import mammoth from "mammoth";
 import * as pdfjsLib from "pdfjs-dist";
 
@@ -530,7 +531,7 @@ export default function Screen() {
       </div>
 
       {/* Analyze Button */}
-      <div className="flex justify-center mb-8">
+      <div className="flex flex-col items-center gap-6 mb-8">
         <Button
           size="lg"
           onClick={handleAnalyze}
@@ -549,6 +550,15 @@ export default function Screen() {
             </>
           )}
         </Button>
+
+        {/* Analysis Progress Animation */}
+        {isAnalyzing && (
+          <Card className="w-full max-w-2xl shadow-sm">
+            <CardContent className="pt-6">
+              <AnalysisProgress isAnalyzing={isAnalyzing} />
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Results Section */}
