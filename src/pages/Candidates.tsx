@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,14 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { getCandidates, updateCandidateStatus, getActionItemByCandidateId, type Candidate } from "@/lib/mock-api";
+import { getCandidates, updateCandidateStatus, type Candidate } from "@/lib/mock-api";
 import { triggerInviteWebhook, triggerRejectWebhook } from "@/lib/webhook-store";
-import { Search, Users, CheckCircle, XCircle, Clock, Mail, Eye, AlertCircle } from "lucide-react";
+import { Search, Users, CheckCircle, XCircle, Clock, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
 export default function Candidates() {
-  const navigate = useNavigate();
   const [candidates, setCandidates] = useState<Candidate[]>(getCandidates());
   const [search, setSearch] = useState("");
   const [fitFilter, setFitFilter] = useState<string>("all");
@@ -87,16 +85,13 @@ export default function Candidates() {
     }
   };
 
-  const handleReviewClick = (candidate: Candidate) => {
-    navigate("/action-items");
-  };
 
   const getStatusBadge = (status: Candidate["status"]) => {
     const styles = {
       Pending: "bg-secondary text-secondary-foreground",
       Invited: "bg-accent text-accent-foreground",
       Rejected: "bg-destructive text-destructive-foreground",
-      Review: "bg-warning text-warning-foreground cursor-pointer hover:bg-warning/80",
+      Review: "bg-warning text-warning-foreground",
     };
     return styles[status];
   };
@@ -252,11 +247,7 @@ export default function Candidates() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge 
-                        className={getStatusBadge(candidate.status)}
-                        onClick={candidate.status === "Review" ? () => handleReviewClick(candidate) : undefined}
-                      >
-                        {candidate.status === "Review" && <AlertCircle className="h-3 w-3 mr-1" />}
+                      <Badge className={getStatusBadge(candidate.status)}>
                         {candidate.status}
                       </Badge>
                     </TableCell>
@@ -265,16 +256,6 @@ export default function Candidates() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        {candidate.status === "Review" && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => handleReviewClick(candidate)}
-                            title="View in Action Items"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        )}
                         {(candidate.status === "Pending" || candidate.status === "Review") && (
                           <>
                             <Button
