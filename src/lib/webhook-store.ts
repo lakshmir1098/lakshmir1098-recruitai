@@ -1,23 +1,6 @@
-// Webhook URL store for invite and reject webhooks
-
-let inviteWebhookUrl = "";
-let rejectWebhookUrl = "";
-
-export function getInviteWebhookUrl(): string {
-  return inviteWebhookUrl;
-}
-
-export function setInviteWebhookUrl(url: string): void {
-  inviteWebhookUrl = url;
-}
-
-export function getRejectWebhookUrl(): string {
-  return rejectWebhookUrl;
-}
-
-export function setRejectWebhookUrl(url: string): void {
-  rejectWebhookUrl = url;
-}
+// n8n webhook URLs for invite and reject workflows
+const INVITE_WEBHOOK_URL = "https://mancyram.app.n8n.cloud/webhook/invite";
+const REJECT_WEBHOOK_URL = "https://mancyram.app.n8n.cloud/webhook/reject";
 
 export async function triggerInviteWebhook(candidateData: {
   name: string;
@@ -25,16 +8,13 @@ export async function triggerInviteWebhook(candidateData: {
   role: string;
   fitScore: number;
 }): Promise<{ success: boolean; error?: string }> {
-  const url = getInviteWebhookUrl();
-  if (!url) {
-    console.warn("Invite webhook URL not configured");
-    return { success: false, error: "Webhook URL not configured" };
-  }
-
   try {
-    const response = await fetch(url, {
+    console.log("Triggering invite webhook for:", candidateData.name);
+    
+    const response = await fetch(INVITE_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      mode: "no-cors",
       body: JSON.stringify({
         action: "invite",
         timestamp: new Date().toISOString(),
@@ -42,10 +22,7 @@ export async function triggerInviteWebhook(candidateData: {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Webhook returned ${response.status}`);
-    }
-
+    console.log("Invite webhook triggered successfully");
     return { success: true };
   } catch (error) {
     console.error("Invite webhook error:", error);
@@ -59,16 +36,13 @@ export async function triggerRejectWebhook(candidateData: {
   role: string;
   fitScore: number;
 }): Promise<{ success: boolean; error?: string }> {
-  const url = getRejectWebhookUrl();
-  if (!url) {
-    console.warn("Reject webhook URL not configured");
-    return { success: false, error: "Webhook URL not configured" };
-  }
-
   try {
-    const response = await fetch(url, {
+    console.log("Triggering reject webhook for:", candidateData.name);
+    
+    const response = await fetch(REJECT_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      mode: "no-cors",
       body: JSON.stringify({
         action: "reject",
         timestamp: new Date().toISOString(),
@@ -76,10 +50,7 @@ export async function triggerRejectWebhook(candidateData: {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Webhook returned ${response.status}`);
-    }
-
+    console.log("Reject webhook triggered successfully");
     return { success: true };
   } catch (error) {
     console.error("Reject webhook error:", error);
