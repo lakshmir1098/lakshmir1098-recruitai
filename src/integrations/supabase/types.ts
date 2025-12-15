@@ -14,7 +14,113 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      candidate_actions: {
+        Row: {
+          action_type: string
+          candidate_id: string
+          comment: string | null
+          created_at: string
+          id: string
+          new_status: string | null
+          previous_status: string | null
+        }
+        Insert: {
+          action_type: string
+          candidate_id: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          new_status?: string | null
+          previous_status?: string | null
+        }
+        Update: {
+          action_type?: string
+          candidate_id?: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          new_status?: string | null
+          previous_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidate_actions_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      candidates: {
+        Row: {
+          action_comment: string | null
+          created_at: string
+          duplicate_info: string | null
+          email: string
+          fit_category: string
+          fit_score: number
+          gaps: string[] | null
+          id: string
+          is_duplicate: boolean | null
+          job_description: string | null
+          name: string
+          recommended_action: string | null
+          resume_file_path: string | null
+          resume_text: string | null
+          role: string
+          screened_at: string
+          screening_summary: string | null
+          status: string
+          strengths: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          action_comment?: string | null
+          created_at?: string
+          duplicate_info?: string | null
+          email: string
+          fit_category: string
+          fit_score: number
+          gaps?: string[] | null
+          id?: string
+          is_duplicate?: boolean | null
+          job_description?: string | null
+          name: string
+          recommended_action?: string | null
+          resume_file_path?: string | null
+          resume_text?: string | null
+          role: string
+          screened_at?: string
+          screening_summary?: string | null
+          status?: string
+          strengths?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          action_comment?: string | null
+          created_at?: string
+          duplicate_info?: string | null
+          email?: string
+          fit_category?: string
+          fit_score?: number
+          gaps?: string[] | null
+          id?: string
+          is_duplicate?: boolean | null
+          job_description?: string | null
+          name?: string
+          recommended_action?: string | null
+          resume_file_path?: string | null
+          resume_text?: string | null
+          role?: string
+          screened_at?: string
+          screening_summary?: string | null
+          status?: string
+          strengths?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
