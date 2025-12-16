@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +39,9 @@ export default function Candidates() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [candidateToDelete, setCandidateToDelete] = useState<Candidate | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkActionType, setBulkActionType] = useState<"invite" | "reject" | "delete" | null>(null);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const loadCandidates = async () => {
@@ -167,6 +171,93 @@ export default function Candidates() {
       toast({
         title: "Error",
         description: "Failed to delete candidate. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Bulk selection handlers
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredCandidates.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredCandidates.map(c => c.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const openBulkDialog = (type: "invite" | "reject" | "delete") => {
+    setBulkActionType(type);
+    setComment("");
+    setBulkDialogOpen(true);
+  };
+
+  const handleBulkAction = async () => {
+    if (!bulkActionType || selectedIds.size === 0) return;
+    
+    setIsProcessing(true);
+    const selectedCandidates = candidates.filter(c => selectedIds.has(c.id));
+    let successCount = 0;
+    let failCount = 0;
+    
+    try {
+      for (const candidate of selectedCandidates) {
+        try {
+          if (bulkActionType === "invite") {
+            const webhookData = {
+              name: candidate.name,
+              email: candidate.email,
+              role: candidate.role,
+              fitScore: candidate.fitScore,
+            };
+            await triggerInviteWebhook(webhookData);
+            await updateCandidateStatus(candidate.id, "Invited", comment || undefined);
+            successCount++;
+          } else if (bulkActionType === "reject") {
+            const webhookData = {
+              name: candidate.name,
+              email: candidate.email,
+              role: candidate.role,
+              fitScore: candidate.fitScore,
+            };
+            await triggerRejectWebhook(webhookData);
+            await updateCandidateStatus(candidate.id, "Rejected", comment || undefined);
+            successCount++;
+          } else if (bulkActionType === "delete") {
+            await deleteCandidate(candidate.id);
+            successCount++;
+          }
+        } catch (error) {
+          console.error(`Error processing ${candidate.name}:`, error);
+          failCount++;
+        }
+      }
+      
+      const actionLabel = bulkActionType === "invite" ? "invited" : bulkActionType === "reject" ? "rejected" : "deleted";
+      toast({
+        title: `Bulk ${bulkActionType} complete`,
+        description: `${successCount} candidate(s) ${actionLabel}${failCount > 0 ? `, ${failCount} failed` : ""}.`,
+      });
+      
+      await loadCandidates();
+      setSelectedIds(new Set());
+      setBulkDialogOpen(false);
+    } catch (error) {
+      console.error("Error in bulk action:", error);
+      toast({
+        title: "Error",
+        description: "Failed to complete bulk action. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -325,12 +416,67 @@ export default function Candidates() {
         </CardContent>
       </Card>
 
+      {/* Bulk Actions Bar */}
+      {selectedIds.size > 0 && (
+        <Card className="shadow-sm mb-6 border-primary/50 bg-primary/5">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-foreground">
+                {selectedIds.size} candidate(s) selected
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                  onClick={() => openBulkDialog("invite")}
+                >
+                  <Mail className="h-4 w-4 mr-1" />
+                  Bulk Invite
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                  onClick={() => openBulkDialog("reject")}
+                >
+                  <XCircle className="h-4 w-4 mr-1" />
+                  Bulk Reject
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                  onClick={() => openBulkDialog("delete")}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Bulk Delete
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSelectedIds(new Set())}
+                >
+                  Clear Selection
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Candidates Table */}
       <Card className="shadow-sm">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={filteredCandidates.length > 0 && selectedIds.size === filteredCandidates.length}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </TableHead>
                 <TableHead>Candidate</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead className="text-center">Fit Score</TableHead>
@@ -344,13 +490,19 @@ export default function Candidates() {
             <TableBody>
               {filteredCandidates.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     No candidates found
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredCandidates.map((candidate) => (
-                  <TableRow key={candidate.id} className={cn(candidate.isDuplicate && "bg-amber-50/50")}>
+                  <TableRow key={candidate.id} className={cn(candidate.isDuplicate && "bg-amber-50/50", selectedIds.has(candidate.id) && "bg-primary/5")}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(candidate.id)}
+                        onCheckedChange={() => toggleSelect(candidate.id)}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-start gap-2">
                         {candidate.isDuplicate && (
@@ -526,6 +678,61 @@ export default function Candidates() {
               variant="destructive"
             >
               {isProcessing ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Action Dialog */}
+      <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              {bulkActionType === "invite" && "Bulk Invite Candidates"}
+              {bulkActionType === "reject" && "Bulk Reject Candidates"}
+              {bulkActionType === "delete" && "Bulk Delete Candidates"}
+            </DialogTitle>
+            <DialogDescription>
+              {bulkActionType === "delete" ? (
+                <>
+                  Are you sure you want to delete <strong>{selectedIds.size}</strong> candidate(s)?
+                  This action cannot be undone.
+                </>
+              ) : (
+                <>
+                  You are about to {bulkActionType} <strong>{selectedIds.size}</strong> candidate(s).
+                  {bulkActionType === "invite" && " Interview invites will be sent."}
+                  {bulkActionType === "reject" && " Rejection emails will be sent."}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {bulkActionType !== "delete" && (
+            <div className="py-4">
+              <Label htmlFor="bulk-comment">Add a comment (optional)</Label>
+              <Textarea
+                id="bulk-comment"
+                placeholder="Why are you taking this action? This helps track decisions..."
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                className="mt-2"
+                rows={3}
+              />
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBulkAction}
+              disabled={isProcessing}
+              className={cn(
+                bulkActionType === "invite" && "bg-primary hover:bg-primary/90",
+                (bulkActionType === "reject" || bulkActionType === "delete") && "bg-destructive hover:bg-destructive/90"
+              )}
+            >
+              {isProcessing ? "Processing..." : `Confirm ${bulkActionType === "invite" ? "Invite" : bulkActionType === "reject" ? "Reject" : "Delete"}`}
             </Button>
           </DialogFooter>
         </DialogContent>
