@@ -37,10 +37,12 @@ export default function Settings() {
     setPendingThemeMode(themeConfig.mode);
   }, []);
 
-  // Apply theme colors when resolved theme changes
+  // Apply theme colors when resolved theme or selected themes change
   useEffect(() => {
     if (resolvedTheme) {
-      applyThemeColors(resolvedTheme === "dark");
+      const isDark = resolvedTheme === "dark";
+      const themeId = isDark ? selectedDarkTheme : selectedLightTheme;
+      applyThemeColors(isDark, themeId);
     }
   }, [resolvedTheme, selectedLightTheme, selectedDarkTheme]);
 
@@ -73,7 +75,8 @@ export default function Settings() {
     setTheme(newTheme);
     setTimeout(() => {
       const isDark = newTheme === "dark" || (newTheme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-      applyThemeColors(isDark);
+      const themeId = isDark ? selectedDarkTheme : selectedLightTheme;
+      applyThemeColors(isDark, themeId);
     }, 50);
   };
 
@@ -81,7 +84,7 @@ export default function Settings() {
     setSelectedLightTheme(themeId);
     // Preview immediately but don't save
     if (resolvedTheme === "light") {
-      applyThemeColors(false);
+      applyThemeColors(false, themeId);
     }
   };
 
@@ -89,7 +92,7 @@ export default function Settings() {
     setSelectedDarkTheme(themeId);
     // Preview immediately but don't save
     if (resolvedTheme === "dark") {
-      applyThemeColors(true);
+      applyThemeColors(true, themeId);
     }
   };
 
