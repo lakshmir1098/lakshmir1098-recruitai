@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Settings as SettingsIcon, Bell, Database, Palette, Sun, Moon, Monitor } from "lucide-react";
 import { getSettings, saveSettings } from "@/lib/settings-store";
 import { useTheme } from "next-themes";
-import { lightThemes, darkThemes, getThemeConfig, saveThemeConfig } from "@/lib/theme-store";
+import { lightThemes, darkThemes, getThemeConfig, saveThemeConfig, applyThemeColors } from "@/lib/theme-store";
 
 export default function Settings() {
   const [autoInviteStrong, setAutoInviteStrong] = useState(true);
@@ -22,7 +22,7 @@ export default function Settings() {
   const [selectedLightTheme, setSelectedLightTheme] = useState("default");
   const [selectedDarkTheme, setSelectedDarkTheme] = useState("default");
   const { toast } = useToast();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
 
   // Load settings on mount
   useEffect(() => {
@@ -34,6 +34,13 @@ export default function Settings() {
     setSelectedLightTheme(themeConfig.lightTheme);
     setSelectedDarkTheme(themeConfig.darkTheme);
   }, []);
+
+  // Apply theme colors when resolved theme changes
+  useEffect(() => {
+    if (resolvedTheme) {
+      applyThemeColors(resolvedTheme === "dark");
+    }
+  }, [resolvedTheme, selectedLightTheme, selectedDarkTheme]);
 
   // Save automation settings immediately on toggle
   const handleAutoInviteChange = (checked: boolean) => {
@@ -61,6 +68,11 @@ export default function Settings() {
   const handleThemeChange = (newTheme: string) => {
     setTheme(newTheme);
     saveThemeConfig({ mode: newTheme as "light" | "dark" | "system" });
+    // Apply colors after a short delay to let next-themes update
+    setTimeout(() => {
+      const isDark = newTheme === "dark" || (newTheme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      applyThemeColors(isDark);
+    }, 50);
     toast({
       title: "Theme Updated",
       description: `Switched to ${newTheme === "system" ? "system" : newTheme} mode.`,
@@ -70,6 +82,9 @@ export default function Settings() {
   const handleLightThemeChange = (themeId: string) => {
     setSelectedLightTheme(themeId);
     saveThemeConfig({ lightTheme: themeId });
+    if (resolvedTheme === "light") {
+      applyThemeColors(false);
+    }
     toast({
       title: "Light Theme Updated",
       description: `Light theme set to ${lightThemes.find(t => t.id === themeId)?.name}.`,
@@ -79,6 +94,9 @@ export default function Settings() {
   const handleDarkThemeChange = (themeId: string) => {
     setSelectedDarkTheme(themeId);
     saveThemeConfig({ darkTheme: themeId });
+    if (resolvedTheme === "dark") {
+      applyThemeColors(true);
+    }
     toast({
       title: "Dark Theme Updated",
       description: `Dark theme set to ${darkThemes.find(t => t.id === themeId)?.name}.`,

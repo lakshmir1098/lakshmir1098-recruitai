@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { ThemeInitializer } from "@/components/ThemeInitializer";
 import Login from "./pages/Login";
 import Screen from "./pages/Screen";
 import Candidates from "./pages/Candidates";
@@ -17,6 +18,7 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+      <ThemeInitializer />
       <TooltipProvider>
         <Toaster />
         <Sonner />

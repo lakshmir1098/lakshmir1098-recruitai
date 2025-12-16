@@ -521,7 +521,7 @@ export default function Candidates() {
                 </TableRow>
               ) : (
                 filteredCandidates.map((candidate) => (
-                  <TableRow key={candidate.id} className={cn(candidate.isDuplicate && "bg-amber-50/50", selectedIds.has(candidate.id) && "bg-primary/5")}>
+                  <TableRow key={candidate.id} className={cn(candidate.isDuplicate && "bg-warning/10 dark:bg-warning/20", selectedIds.has(candidate.id) && "bg-primary/5")}>
                     <TableCell>
                       <Checkbox
                         checked={selectedIds.has(candidate.id)}
