@@ -16,9 +16,9 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { fetchCandidates, updateCandidateStatus, type Candidate } from "@/lib/candidates-db";
+import { fetchCandidates, updateCandidateStatus, deleteCandidate, type Candidate } from "@/lib/candidates-db";
 import { triggerInviteWebhook, triggerRejectWebhook } from "@/lib/webhook-store";
-import { Search, Users, CheckCircle, XCircle, Clock, Mail, AlertTriangle, MessageSquare, TrendingUp, FileText, Loader2 } from "lucide-react";
+import { Search, Users, CheckCircle, XCircle, Clock, Mail, AlertTriangle, MessageSquare, TrendingUp, FileText, Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ResumePreviewDialog } from "@/components/ResumePreviewDialog";
@@ -36,6 +36,8 @@ export default function Candidates() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [previewCandidate, setPreviewCandidate] = useState<Candidate | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [candidateToDelete, setCandidateToDelete] = useState<Candidate | null>(null);
   const { toast } = useToast();
 
   const loadCandidates = async () => {
@@ -133,6 +135,38 @@ export default function Candidates() {
       toast({
         title: "Error",
         description: "Failed to process action. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const openDeleteDialog = (candidate: Candidate) => {
+    setCandidateToDelete(candidate);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!candidateToDelete) return;
+    
+    setIsProcessing(true);
+    
+    try {
+      await deleteCandidate(candidateToDelete.id);
+      
+      toast({
+        title: "Candidate Deleted",
+        description: `${candidateToDelete.name} has been removed from the database.`,
+      });
+      
+      await loadCandidates();
+      setDeleteDialogOpen(false);
+    } catch (error) {
+      console.error("Error deleting candidate:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete candidate. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -396,6 +430,15 @@ export default function Candidates() {
                             </Button>
                           </>
                         )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => openDeleteDialog(candidate)}
+                          title="Delete candidate"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -458,6 +501,35 @@ export default function Candidates() {
         open={previewOpen}
         onOpenChange={setPreviewOpen}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Candidate</DialogTitle>
+            <DialogDescription>
+              {candidateToDelete && (
+                <>
+                  Are you sure you want to delete <strong>{candidateToDelete.name}</strong>?
+                  This action cannot be undone and will permanently remove all their data.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmDelete}
+              disabled={isProcessing}
+              variant="destructive"
+            >
+              {isProcessing ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
