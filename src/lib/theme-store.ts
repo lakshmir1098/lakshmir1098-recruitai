@@ -52,10 +52,10 @@ export const saveThemeConfig = (config: Partial<ThemeConfig>) => {
   return updated;
 };
 
-export const applyThemeColors = (isDark: boolean) => {
+export const applyThemeColors = (isDark: boolean, overrideThemeId?: string) => {
   const config = getThemeConfig();
   const themes = isDark ? darkThemes : lightThemes;
-  const themeId = isDark ? config.darkTheme : config.lightTheme;
+  const themeId = overrideThemeId || (isDark ? config.darkTheme : config.lightTheme);
   const theme = themes.find(t => t.id === themeId) || themes[0];
   
   const root = document.documentElement;
