@@ -8,6 +8,8 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ThemeInitializer } from "@/components/ThemeInitializer";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Screen from "./pages/Screen";
 import Candidates from "./pages/Candidates";
 import Settings from "./pages/Settings";
@@ -26,6 +28,8 @@ const App = () => (
           <AuthProvider>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route element={<AppLayout />}>
                 <Route path="/screen" element={<Screen />} />
                 <Route path="/candidates" element={<Candidates />} />
