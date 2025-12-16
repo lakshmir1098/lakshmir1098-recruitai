@@ -69,7 +69,8 @@ export default function Candidates() {
     const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
                          c.role.toLowerCase().includes(search.toLowerCase());
     const matchesFit = fitFilter === "all" || c.fitCategory === fitFilter;
-    const matchesStatus = statusFilter === "all" || c.status === statusFilter;
+    const matchesStatus = statusFilter === "all" || 
+                          (statusFilter === "Review" ? (c.status === "Pending" || c.status === "Review") : c.status === statusFilter);
     return matchesSearch && matchesFit && matchesStatus;
   });
 
@@ -332,7 +333,13 @@ export default function Candidates() {
             </div>
           </CardContent>
         </Card>
-        <Card className="shadow-sm">
+        <Card 
+          className={cn(
+            "shadow-sm cursor-pointer transition-all hover:shadow-md hover:ring-2 hover:ring-primary/20",
+            statusFilter === "Review" && "ring-2 ring-primary"
+          )}
+          onClick={() => setStatusFilter(statusFilter === "Review" ? "all" : "Review")}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-slate-100 rounded-lg">
