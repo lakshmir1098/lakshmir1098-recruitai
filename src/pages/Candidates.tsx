@@ -338,7 +338,7 @@ export default function Candidates() {
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead>Screened</TableHead>
                 <TableHead className="text-center">Screening Preview</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -406,8 +406,8 @@ export default function Candidates() {
                         <FileText className="h-4 w-4" />
                       </Button>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+                    <TableCell className="text-center">
+                      <div className="flex justify-center gap-2">
                         {(candidate.status === "Pending" || candidate.status === "Review") && (
                           <>
                             <Button
