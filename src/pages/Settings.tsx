@@ -21,6 +21,7 @@ export default function Settings() {
   const [dataRetention, setDataRetention] = useState("90");
   const [selectedLightTheme, setSelectedLightTheme] = useState("default");
   const [selectedDarkTheme, setSelectedDarkTheme] = useState("default");
+  const [pendingThemeMode, setPendingThemeMode] = useState<string | null>(null);
   const { toast } = useToast();
   const { theme, setTheme, resolvedTheme } = useTheme();
 
@@ -33,6 +34,7 @@ export default function Settings() {
     const themeConfig = getThemeConfig();
     setSelectedLightTheme(themeConfig.lightTheme);
     setSelectedDarkTheme(themeConfig.darkTheme);
+    setPendingThemeMode(themeConfig.mode);
   }, []);
 
   // Apply theme colors when resolved theme changes
@@ -66,44 +68,38 @@ export default function Settings() {
   };
 
   const handleThemeChange = (newTheme: string) => {
+    setPendingThemeMode(newTheme);
+    // Preview the theme immediately but don't save
     setTheme(newTheme);
-    saveThemeConfig({ mode: newTheme as "light" | "dark" | "system" });
-    // Apply colors after a short delay to let next-themes update
     setTimeout(() => {
       const isDark = newTheme === "dark" || (newTheme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
       applyThemeColors(isDark);
     }, 50);
-    toast({
-      title: "Theme Updated",
-      description: `Switched to ${newTheme === "system" ? "system" : newTheme} mode.`,
-    });
   };
 
   const handleLightThemeChange = (themeId: string) => {
     setSelectedLightTheme(themeId);
-    saveThemeConfig({ lightTheme: themeId });
+    // Preview immediately but don't save
     if (resolvedTheme === "light") {
       applyThemeColors(false);
     }
-    toast({
-      title: "Light Theme Updated",
-      description: `Light theme set to ${lightThemes.find(t => t.id === themeId)?.name}.`,
-    });
   };
 
   const handleDarkThemeChange = (themeId: string) => {
     setSelectedDarkTheme(themeId);
-    saveThemeConfig({ darkTheme: themeId });
+    // Preview immediately but don't save
     if (resolvedTheme === "dark") {
       applyThemeColors(true);
     }
-    toast({
-      title: "Dark Theme Updated",
-      description: `Dark theme set to ${darkThemes.find(t => t.id === themeId)?.name}.`,
-    });
   };
 
   const handleSave = () => {
+    // Save theme settings
+    saveThemeConfig({ 
+      mode: pendingThemeMode as "light" | "dark" | "system",
+      lightTheme: selectedLightTheme,
+      darkTheme: selectedDarkTheme
+    });
     toast({
       title: "Settings Saved",
       description: "Your preferences have been updated.",
@@ -136,7 +132,7 @@ export default function Settings() {
               <Label>Theme Mode</Label>
               <div className="flex gap-2">
                 <Button
-                  variant={theme === "light" ? "default" : "outline"}
+                  variant={pendingThemeMode === "light" ? "default" : "outline"}
                   size="sm"
                   onClick={() => handleThemeChange("light")}
                   className="flex items-center gap-2"
@@ -145,7 +141,7 @@ export default function Settings() {
                   Light
                 </Button>
                 <Button
-                  variant={theme === "dark" ? "default" : "outline"}
+                  variant={pendingThemeMode === "dark" ? "default" : "outline"}
                   size="sm"
                   onClick={() => handleThemeChange("dark")}
                   className="flex items-center gap-2"
@@ -154,7 +150,7 @@ export default function Settings() {
                   Dark
                 </Button>
                 <Button
-                  variant={theme === "system" ? "default" : "outline"}
+                  variant={pendingThemeMode === "system" ? "default" : "outline"}
                   size="sm"
                   onClick={() => handleThemeChange("system")}
                   className="flex items-center gap-2"
