@@ -39,7 +39,7 @@ export const getThemeConfig = (): ThemeConfig => {
     return JSON.parse(stored);
   }
   return {
-    mode: "light",
+    mode: "dark",
     lightTheme: "default",
     darkTheme: "default",
   };
