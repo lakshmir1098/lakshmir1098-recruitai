@@ -303,7 +303,7 @@ export default function Candidates() {
                 <TableHead className="text-center">Category</TableHead>
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead>Screened</TableHead>
-                <TableHead className="text-center">Resume</TableHead>
+                <TableHead className="text-center">Screening Preview</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
