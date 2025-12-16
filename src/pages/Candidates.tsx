@@ -307,7 +307,13 @@ export default function Candidates() {
 
       {/* Stats Cards */}
       <div className="grid sm:grid-cols-4 gap-4 mb-6">
-        <Card className="shadow-sm">
+        <Card 
+          className={cn(
+            "shadow-sm cursor-pointer transition-all hover:shadow-md hover:ring-2 hover:ring-primary/20",
+            fitFilter === "Strong" && "ring-2 ring-primary"
+          )}
+          onClick={() => setFitFilter(fitFilter === "Strong" ? "all" : "Strong")}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-100 rounded-lg">
