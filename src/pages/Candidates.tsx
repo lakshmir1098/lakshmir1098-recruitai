@@ -345,7 +345,13 @@ export default function Candidates() {
             </div>
           </CardContent>
         </Card>
-        <Card className="shadow-sm">
+        <Card 
+          className={cn(
+            "shadow-sm cursor-pointer transition-all hover:shadow-md hover:ring-2 hover:ring-primary/20",
+            statusFilter === "Invited" && "ring-2 ring-primary"
+          )}
+          onClick={() => setStatusFilter(statusFilter === "Invited" ? "all" : "Invited")}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-100 rounded-lg">
