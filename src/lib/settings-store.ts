@@ -3,6 +3,9 @@
 interface ScreeningSettings {
   autoInviteEnabled: boolean;
   autoRejectEnabled: boolean;
+  maxInvitesPerWeek: string;
+  timezone: string;
+  dataRetention: string;
 }
 
 const SETTINGS_KEY = "recruitai_settings";
@@ -10,6 +13,9 @@ const SETTINGS_KEY = "recruitai_settings";
 const defaultSettings: ScreeningSettings = {
   autoInviteEnabled: true,
   autoRejectEnabled: true,
+  maxInvitesPerWeek: "50",
+  timezone: "America/New_York",
+  dataRetention: "90",
 };
 
 export function getSettings(): ScreeningSettings {
