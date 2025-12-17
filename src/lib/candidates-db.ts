@@ -287,3 +287,16 @@ export async function getCandidateById(id: string): Promise<Candidate | null> {
 
   return data ? transformCandidate(data) : null;
 }
+
+// Delete a candidate from database
+export async function deleteCandidate(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("candidates")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error deleting candidate:", error);
+    throw error;
+  }
+}
