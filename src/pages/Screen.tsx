@@ -402,7 +402,6 @@ export default function Screen() {
 
   const handleReset = () => {
     setResult(null);
-    setJobDescription("");
     setResumeText("");
     setCandidateName("");
     setCandidateEmail("");
@@ -411,7 +410,6 @@ export default function Screen() {
     setUploadedFile(null);
     setUploadedFileName(null);
     setAddedCandidateId(null);
-    clearSession();
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
