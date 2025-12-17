@@ -813,19 +813,21 @@ export default function Screen() {
 
                 {/* Status */}
                 <div className="text-center flex flex-col items-center justify-center">
-                  <Badge className={cn(
-                    "text-lg px-4 py-1",
-                    processedStatus === "invited" && "bg-accent text-accent-foreground",
-                    processedStatus === "rejected" && "bg-destructive text-destructive-foreground",
-                    processedStatus === "review" && "bg-warning text-warning-foreground"
-                  )}>
-                    {processedStatus === "invited" && <CheckCircle className="h-4 w-4 mr-1" />}
-                    {processedStatus === "rejected" && <XCircle className="h-4 w-4 mr-1" />}
-                    {processedStatus === "review" && <AlertCircle className="h-4 w-4 mr-1" />}
-                    {processedStatus === "invited" && "Invited"}
-                    {processedStatus === "rejected" && "Rejected"}
-                    {processedStatus === "review" && "Review Needed"}
-                  </Badge>
+                  {processedStatus && (
+                    <Badge className={cn(
+                      "text-lg px-4 py-1",
+                      processedStatus === "invited" && "bg-accent text-accent-foreground",
+                      processedStatus === "rejected" && "bg-destructive text-destructive-foreground",
+                      processedStatus === "review" && "bg-warning text-warning-foreground"
+                    )}>
+                      {processedStatus === "invited" && <CheckCircle className="h-4 w-4 mr-1" />}
+                      {processedStatus === "rejected" && <XCircle className="h-4 w-4 mr-1" />}
+                      {processedStatus === "review" && <AlertCircle className="h-4 w-4 mr-1" />}
+                      {processedStatus === "invited" && "Invited"}
+                      {processedStatus === "rejected" && "Rejected"}
+                      {processedStatus === "review" && "Review Needed"}
+                    </Badge>
+                  )}
                 </div>
               </div>
             </CardContent>
