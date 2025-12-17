@@ -304,6 +304,11 @@ export default function Screen() {
 
       // Determine status based on score
       const status = determineStatus(screeningResult.fitScore);
+
+      // Always set UI status immediately, even if saving to the database fails.
+      // This prevents the "Review Needed" badge from disappearing when addCandidate throws.
+      setProcessedStatus(status === "Invited" ? "invited" : status === "Rejected" ? "rejected" : "review");
+
       const candidateData = {
         name: candidateName,
         email: candidateEmail,
@@ -331,7 +336,6 @@ export default function Screen() {
 
       // Trigger appropriate webhook based on status
       if (status === "Invited") {
-        setProcessedStatus("invited");
         const webhookResult = await triggerInviteWebhook(candidateData);
         if (webhookResult.success) {
           toast({
@@ -346,7 +350,6 @@ export default function Screen() {
           });
         }
       } else if (status === "Rejected") {
-        setProcessedStatus("rejected");
         const webhookResult = await triggerRejectWebhook(candidateData);
         if (webhookResult.success) {
           toast({
@@ -361,17 +364,16 @@ export default function Screen() {
           });
         }
       } else {
-        setProcessedStatus("review");
         const score = screeningResult.fitScore;
         let message = `${candidateName} added to Candidates for manual review.`;
-        
+
         // Provide context if auto-actions were disabled
         if (score >= 90 && !isAutoInviteEnabled()) {
           message = `${candidateName} scored 90%+ but auto-invite is disabled. Added to Candidates for manual review.`;
         } else if (score <= 40 && !isAutoRejectEnabled()) {
           message = `${candidateName} scored ≤40% but auto-reject is disabled. Added to Candidates for manual review.`;
         }
-        
+
         toast({
           title: "Review Needed",
           description: message,
