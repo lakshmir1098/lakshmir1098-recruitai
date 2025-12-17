@@ -1,6 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
+// Helper to get current user ID
+async function getCurrentUserId(): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id ?? null;
+}
+
 export type CandidateStatus = "Pending" | "Invited" | "Rejected" | "Review";
 export type FitCategory = "Strong" | "Medium" | "Low";
 
@@ -126,6 +132,11 @@ export async function addCandidate(candidate: {
   // Check for duplicates first
   const duplicateCheck = await checkDuplicate(candidate.email, candidate.role);
 
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    throw new Error("User must be authenticated to add candidates");
+  }
+
   const { data, error } = await supabase
     .from("candidates")
     .insert({
@@ -144,6 +155,7 @@ export async function addCandidate(candidate: {
       recommended_action: candidate.recommendedAction,
       is_duplicate: duplicateCheck.isDuplicate,
       duplicate_info: duplicateCheck.duplicateInfo,
+      user_id: userId,
     })
     .select()
     .single();
@@ -200,6 +212,8 @@ export async function logCandidateAction(
   previousStatus?: string,
   newStatus?: string
 ): Promise<void> {
+  const userId = await getCurrentUserId();
+  
   const { error } = await supabase
     .from("candidate_actions")
     .insert({
@@ -208,6 +222,7 @@ export async function logCandidateAction(
       comment,
       previous_status: previousStatus,
       new_status: newStatus,
+      user_id: userId,
     });
 
   if (error) {

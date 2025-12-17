@@ -23,6 +23,7 @@ export type Database = {
           id: string
           new_status: string | null
           previous_status: string | null
+          user_id: string | null
         }
         Insert: {
           action_type: string
@@ -32,6 +33,7 @@ export type Database = {
           id?: string
           new_status?: string | null
           previous_status?: string | null
+          user_id?: string | null
         }
         Update: {
           action_type?: string
@@ -41,6 +43,7 @@ export type Database = {
           id?: string
           new_status?: string | null
           previous_status?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -74,6 +77,7 @@ export type Database = {
           status: string
           strengths: string[] | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           action_comment?: string | null
@@ -96,6 +100,7 @@ export type Database = {
           status?: string
           strengths?: string[] | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           action_comment?: string | null
@@ -118,6 +123,7 @@ export type Database = {
           status?: string
           strengths?: string[] | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
