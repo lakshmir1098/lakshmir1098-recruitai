@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { fetchCandidates, updateCandidateStatus, deleteCandidate, type Candidate } from "@/lib/candidates-db";
 import { triggerInviteWebhook, triggerRejectWebhook } from "@/lib/webhook-store";
-import { Search, Users, CheckCircle, XCircle, Clock, Mail, AlertTriangle, MessageSquare, TrendingUp, FileText, Loader2, Trash2 } from "lucide-react";
+import { Search, Users, CheckCircle, XCircle, Clock, Mail, AlertTriangle, MessageSquare, TrendingUp, FileText, Loader2, Trash2, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ResumePreviewDialog } from "@/components/ResumePreviewDialog";
@@ -30,6 +30,8 @@ export default function Candidates() {
   const [search, setSearch] = useState("");
   const [fitFilter, setFitFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("date-desc");
   const [commentDialogOpen, setCommentDialogOpen] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [actionType, setActionType] = useState<"invite" | "reject" | null>(null);
@@ -65,14 +67,33 @@ export default function Candidates() {
     loadCandidates();
   }, []);
 
-  const filteredCandidates = candidates.filter((c) => {
-    const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
-                         c.role.toLowerCase().includes(search.toLowerCase());
-    const matchesFit = fitFilter === "all" || c.fitCategory === fitFilter;
-    const matchesStatus = statusFilter === "all" || 
-                          (statusFilter === "Review" ? (c.status === "Pending" || c.status === "Review") : c.status === statusFilter);
-    return matchesSearch && matchesFit && matchesStatus;
-  });
+  // Get unique roles for filter dropdown
+  const uniqueRoles = [...new Set(candidates.map(c => c.role))].sort();
+
+  const filteredCandidates = candidates
+    .filter((c) => {
+      const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
+                           c.role.toLowerCase().includes(search.toLowerCase());
+      const matchesFit = fitFilter === "all" || c.fitCategory === fitFilter;
+      const matchesStatus = statusFilter === "all" || 
+                            (statusFilter === "Review" ? (c.status === "Pending" || c.status === "Review") : c.status === statusFilter);
+      const matchesRole = roleFilter === "all" || c.role === roleFilter;
+      return matchesSearch && matchesFit && matchesStatus && matchesRole;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "date-desc":
+          return new Date(b.screenedAt).getTime() - new Date(a.screenedAt).getTime();
+        case "date-asc":
+          return new Date(a.screenedAt).getTime() - new Date(b.screenedAt).getTime();
+        case "name-asc":
+          return a.name.localeCompare(b.name);
+        case "name-desc":
+          return b.name.localeCompare(a.name);
+        default:
+          return 0;
+      }
+    });
 
   // Auto-calculated stats from actual candidate data
   const stats = {
@@ -414,6 +435,17 @@ export default function Candidates() {
                 />
               </div>
             </div>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Job Role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                {uniqueRoles.map((role) => (
+                  <SelectItem key={role} value={role}>{role}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select value={fitFilter} onValueChange={setFitFilter}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Fit Category" />
@@ -435,6 +467,18 @@ export default function Candidates() {
                 <SelectItem value="Invited">Invited</SelectItem>
                 <SelectItem value="Rejected">Rejected</SelectItem>
                 <SelectItem value="Review">Review</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-[180px]">
+                <ArrowUpDown className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Sort By" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date-desc">Date (Newest)</SelectItem>
+                <SelectItem value="date-asc">Date (Oldest)</SelectItem>
+                <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                <SelectItem value="name-desc">Name (Z-A)</SelectItem>
               </SelectContent>
             </Select>
           </div>
