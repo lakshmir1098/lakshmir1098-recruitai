@@ -29,6 +29,9 @@ export default function Settings() {
     const settings = getSettings();
     setAutoInviteStrong(settings.autoInviteEnabled);
     setAutoRejectLow(settings.autoRejectEnabled);
+    setMaxInvitesPerWeek(settings.maxInvitesPerWeek);
+    setTimezone(settings.timezone);
+    setDataRetention(settings.dataRetention);
     const themeConfig = getThemeConfig();
     setSelectedLightTheme(themeConfig.lightTheme);
     setSelectedDarkTheme(themeConfig.darkTheme);
@@ -224,11 +227,17 @@ export default function Settings() {
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Max invites per week</Label>
-                <Input type="number" value={maxInvitesPerWeek} onChange={e => setMaxInvitesPerWeek(e.target.value)} min="1" max="500" />
+                <Input type="number" value={maxInvitesPerWeek} onChange={e => {
+                  setMaxInvitesPerWeek(e.target.value);
+                  saveSettings({ maxInvitesPerWeek: e.target.value });
+                }} min="1" max="500" />
               </div>
               <div className="space-y-2">
                 <Label>Timezone</Label>
-                <Select value={timezone} onValueChange={setTimezone}>
+                <Select value={timezone} onValueChange={(value) => {
+                  setTimezone(value);
+                  saveSettings({ timezone: value });
+                }}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -261,7 +270,10 @@ export default function Settings() {
           <CardContent>
             <div className="space-y-2">
               <Label>Data retention period</Label>
-              <Select value={dataRetention} onValueChange={setDataRetention}>
+              <Select value={dataRetention} onValueChange={(value) => {
+                setDataRetention(value);
+                saveSettings({ dataRetention: value });
+              }}>
                 <SelectTrigger className="w-full sm:w-[250px]">
                   <SelectValue />
                 </SelectTrigger>

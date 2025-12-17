@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { FileSearch, Users, Settings, LogOut } from "lucide-react";
@@ -13,10 +13,12 @@ const navItems = [
 
 export function Header() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { signOut } = useAuth();
 
   const handleLogout = async () => {
     await signOut();
+    navigate("/login", { replace: true });
   };
 
   return (
