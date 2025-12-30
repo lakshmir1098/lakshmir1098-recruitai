@@ -97,7 +97,13 @@ serve(async (req) => {
       throw new Error("n8n webhook returned invalid JSON. Please check the n8n workflow configuration.");
     }
 
-    console.log("n8n parsed response keys:", Object.keys(data));
+    // Handle array response - n8n sometimes returns an array with a single object
+    if (Array.isArray(data)) {
+      console.log("n8n returned array response, extracting first element");
+      data = data[0];
+    }
+
+    console.log("n8n parsed response keys:", Object.keys(data || {}));
     console.log("n8n parsed response:", JSON.stringify(data).substring(0, 500));
     console.log("n8n response parsed successfully for user:", user.id);
 
