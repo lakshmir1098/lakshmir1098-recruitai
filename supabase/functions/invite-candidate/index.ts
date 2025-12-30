@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const INVITE_WEBHOOK_URL = "https://mancyram.app.n8n.cloud/webhook/api/recruitai/action/invite";
+const INVITE_WEBHOOK_URL = "https://mancy-new.app.n8n.cloud/webhook/api/recruitai/action/invite";
 
 serve(async (req) => {
   // Handle CORS preflight requests
