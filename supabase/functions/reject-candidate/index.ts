@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const REJECT_WEBHOOK_URL = "https://mancyram.app.n8n.cloud/webhook/2cb93916-2c97-44ae-a87c-99fdcb24c1dc";
+const REJECT_WEBHOOK_URL = "https://mancy-new.app.n8n.cloud/webhook/2cb93916-2c97-44ae-a87c-99fdcb24c1dc";
 
 serve(async (req) => {
   // Handle CORS preflight requests
