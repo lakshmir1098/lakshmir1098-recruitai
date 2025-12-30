@@ -82,6 +82,7 @@ serve(async (req) => {
     // Safely parse the response - handle empty or invalid JSON
     const responseText = await response.text();
     console.log("n8n raw response length:", responseText.length);
+    console.log("n8n raw response preview:", responseText.substring(0, 1000));
     
     if (!responseText || responseText.trim() === '') {
       console.error("n8n returned empty response");
@@ -96,6 +97,8 @@ serve(async (req) => {
       throw new Error("n8n webhook returned invalid JSON. Please check the n8n workflow configuration.");
     }
 
+    console.log("n8n parsed response keys:", Object.keys(data));
+    console.log("n8n parsed response:", JSON.stringify(data).substring(0, 500));
     console.log("n8n response parsed successfully for user:", user.id);
 
     return new Response(JSON.stringify(data), {
